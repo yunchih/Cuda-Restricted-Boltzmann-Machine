@@ -57,16 +57,18 @@ void RBM::do_contrastive_divergence(const float* v_0){
 }
 void RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
-    matrixMul(v, this->W, h, 1, n_visible, n_hidden)
-    thrust::transform(h, h + n_hidden, this->c, h, thrust::plus<int>()); 
-    thrust::transform(h, h + n_hidden, sigmoid()); 
+    matrixMul(v, this->W, h, 1, n_visible, n_hidden, stream)
+    const int bsize = 128;
+    const int gsize = CeilDiv(n_hidden,bsize);
+    add_sigmoid<<<gsize,bsize>>>(h, this->c);
 }
-void RBM::get_v_given_h(const float* h, const float* v){
-    // h = sigmoid(dot(v, W) + c)
+void RBM::get_v_given_h(const float* h, const float* v, cudaStream_t stream){
+    // v = sigmoid(dot(h, W) + b)
     /* Transpose the second matrix */
-    matrixMulTranspose(h, this->W, v, 1, n_visible, n_hidden, 2); 
-    thrust::transform(h, h + n_hidden, this->c, h, thrust::plus<int>()); 
-    thrust::transform(h, h + n_hidden, sigmoid()); 
+    matrixMulTranspose(h, this->W, v, 1, n_visible, n_hidden, 2, stream); 
+    const int bsize = 128;
+    const int gsize = CeilDiv(n_hidden,bsize);
+    add_sigmoid<<<gsize,bsize>>>(h, this->b);
 }
 void RBM::train(std::vector<float*> training_data, int minibatch_index){
     for(int i = minibatch_index; i < minibatch_index + minibatch_size; ++i){

@@ -3,7 +3,7 @@
 __device__ __host__ int CeilDiv(int a, int b) { return (a-1)/b + 1; }
 
 __forceinline__ __device__ float sigmoidf(float in) {
-       return in / (1.f + fabsf(in));  
+    return in / (1.f + fabsf(in));  
 }
 __global__ void vectorAdd(float *y, float *a,  float *b, int n) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,6 +61,12 @@ void matrixMul(const float* x, const float*y, float* z, int yi, int xj, int yj, 
     );
     if(stat != CUBLAS_STATUS_SUCCESS)
         errx(1,"CUBLAS matrix multiplication error\n");
+}
+// x = sigmoid(x + y)
+__global__ void add_sigmoid(float* x, const float* y, int size){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if( i < size )
+        x[i] += sigmoidf(x[i] + y[i]);
 }
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
