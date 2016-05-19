@@ -1,5 +1,29 @@
 #include "utils.h"
 
+#define cudaErrCheck(stat) { cudaErrCheck_((stat), __FILE__, __LINE__); }
+void cudaErrCheck_(cudaError_t stat, const char *file, int line) {
+   if (stat != cudaSuccess) {
+      fprintf(stderr, "CUDA Error: %s at %s %d\n", cudaGetErrorString(stat), file, line);
+      exit(1);
+   }
+}
+
+#define cublasErrCheck(stat) { cublasErrCheck_((stat), __FILE__, __LINE__); }
+void cublasErrCheck_(cublasStatus_t stat, const char *file, int line) {
+   if (stat != CUBLAS_STATUS_SUCCESS) {
+      fprintf(stderr, "cuBLAS Error: %d at %s %d\n", stat, file, line);
+      exit(1);
+   }
+}
+
+#define curandErrCheck(stat) { curandErrCheck_((stat), __FILE__, __LINE__); }
+void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
+   if (stat != CURAND_STATUS_SUCCESS) {
+      fprintf(stderr, "cuRand Error: %d at %s %d\n", stat, file, line);
+      exit(1);
+   }
+}
+
 __device__ __host__ int CeilDiv(int a, int b) { return (a-1)/b + 1; }
 
 __forceinline__ __device__ float sigmoidf(float in) {
@@ -45,22 +69,50 @@ void randn(float *array, int size) {
     curandDestroyGenerator(prng);
 }
 // z(m,n) = x(m,k) * y(k,n)
-void matrixMul(const float* x, const float*y, float* z, int yi, int xj, int yj, int zj, const int transpose_opt){
+void matrixMul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
     float alpha = 1.0, beta = 0.0;
-    cublasStatus_t stat;
-    stat = cublasSgemm(
-        cublasHandle(), 
-        transpose_opt == 1 ? CUBLAS_OP_T : CUBLAS_OP_N, 
-        transpose_opt == 2 ? CUBLAS_OP_T : CUBLAS_OP_N, 
-        yj, xj, yi,
+    int m = yj, n = xi, k = yi;
+    cublasErrCheck(cublasSgemm(
+        cublasHandle(),
+        CUBLAS_OP_N,
+        CUBLAS_OP_N,
+        m, n, k,
         &alpha,
         y, yj,
         x, xj,
         &beta,
         z, zj
-    );
-    if(stat != CUBLAS_STATUS_SUCCESS)
-        errx(1,"CUBLAS matrix multiplication error\n");
+    ));
+}
+void matrixMulTranposeFirst(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
+    float alpha = 1.0, beta = 0.0;
+    int m = yj, n = xj, k = yi;
+    cublasErrCheck(cublasSgemm(
+        cublasHandle(),
+        CUBLAS_OP_N,
+        CUBLAS_OP_T,
+        m, n, k,
+        &alpha,
+        y, yj,
+        x, xj,
+        &beta,
+        z, zj
+    ));
+}
+void matrixMulTranposeSecond(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
+    float alpha = 1.0, beta = 0.0;
+    int m = yi, n = xi, k = yj;
+    cublasErrCheck(cublasSgemm(
+        cublasHandle(),
+        CUBLAS_OP_T,
+        CUBLAS_OP_N,
+        m, n, k,
+        &alpha,
+        y, yj,
+        x, xj,
+        &beta,
+        z, zj
+    ));
 }
 // x = sigmoid(x + y)
 __global__ void add_sigmoid(float* x, const float* y, int size){

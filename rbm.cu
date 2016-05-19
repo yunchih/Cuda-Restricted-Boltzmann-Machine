@@ -1,34 +1,22 @@
 #include "rbm.h"
+#include "utils.h"
 
-dim3 gdim(CeilDiv(wt,32), CeilDiv(ht,16)), bdim(32,16);
-
-RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, int _n_epoch){
-    W = thrust::device_malloc<float>(_n_visible * _n_hidden);
-    b = thrust::device_malloc<float>(_n_visible);
-    c = thrust::device_malloc<float>(_n_hidden);
-    pW = thrust::raw_pointer_cast(W);
-    pb = thrust::raw_pointer_cast(b);
-    pc = thrust::raw_pointer_cast(c);
-    randn(pW, _n_visible * _n_hidden);
-    randn(pb, _n_visible);
-    randn(pc, _n_hidden);
-}
-void RBM::update_w(float* h_0, float* v_0, float* h_k, float* v_k){
+void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k){
     // W += learning_rate * (outer(h_0, v_0) - outer(h_k, v_k))
-    add_outer_prod(this->W, h_0, v_0, n_hidden, n_visible,  learning_rate);
-    add_outer_prod(this->W, h_k, v_k, n_hidden, n_visible, -learning_rate);
+    add_outer_prod(this->pW, h_0, v_0, n_hidden, n_visible,  learning_rate);
+    add_outer_prod(this->pW, h_k, v_k, n_hidden, n_visible, -learning_rate);
 }
-void RBM::update_b(float* v_0, float* v_k){
+void RBM::update_b(const float* v_0, const float* v_k){
     // b += learning_rate * (v_0 - v_k)
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
-    add_diff<<<gsize,bsize>>>(this->b, v_0, v_k, learning_rate, n_visible);
+    add_diff<<<gsize,bsize>>>(this->pb, v_0, v_k, learning_rate, n_visible);
 }
-void RBM::update_c(float* h_0, float* h_k){
+void RBM::update_c(const float* h_0, const float* h_k){
     // c += learning_rate * (h_0 - h_k)
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
-    add_diff<<<gsize,bsize>>>(this->c, h_0, h_k, learning_rate, n_hidden);
+    add_diff<<<gsize,bsize>>>(this->pc, h_0, h_k, learning_rate, n_hidden);
 }
 void RBM::do_contrastive_divergence(const float* v_0){
     static float *v_k = NULL, *h_k = NULL, *h_0 = NULL;
@@ -57,15 +45,16 @@ void RBM::do_contrastive_divergence(const float* v_0){
 }
 void RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
-    matrixMul(v, this->W, h, 1, n_visible, n_hidden, stream)
+    // matrixMul(const float* x, const float*y, float* z, int yi, int xj, int yj, int zj, const int transpose_opt)
+    matrixMul(v, this->pW, h, 1, n_visible, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
     add_sigmoid<<<gsize,bsize>>>(h, this->c);
 }
-void RBM::get_v_given_h(const float* h, const float* v, cudaStream_t stream){
+void RBM::get_v_given_h(const float* h, const float* v){
     // v = sigmoid(dot(h, W) + b)
     /* Transpose the second matrix */
-    matrixMulTranspose(h, this->W, v, 1, n_visible, n_hidden, 2, stream); 
+    matrixMulTranspose(h, this->pW, v, 1, n_visible, n_hidden, 2); 
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
     add_sigmoid<<<gsize,bsize>>>(h, this->b);

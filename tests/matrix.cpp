@@ -21,7 +21,15 @@ void test(const float* hA, const float* hB, int ai, int aj, int bi, int bj, int 
     cudaMalloc((void**)&C, sizeof(float)*ci*cj);
     cudaMemcpy(A, hA, sizeof(float)*ai*aj, cudaMemcpyHostToDevice);
     cudaMemcpy(B, hB, sizeof(float)*bi*bj, cudaMemcpyHostToDevice);
-    matrixMul(A,B,C, bj, aj, bj, cj, opt);
+    // matrixMul(A,B,C, bi, aj, bj, cj, opt);
+    switch(opt){
+        case 0:
+            matrixMul(A,B,C, ai, aj, bi, bj, cj);break;
+        case 1:
+            matrixMulTranposeFirst(A,B,C, ai, aj, bi, bj, cj);break;
+        case 2:
+            matrixMulTranposeSecond(A,B,C, ai, aj, bi, bj, cj);break;
+    }
     puts("----- test -----");
     printMatrix(A,ai,aj);
     printMatrix(B,bi,bj);
@@ -50,13 +58,13 @@ int main(int argc, char *argv[])
     );
 
     float hA2[] = {
-        2.,1.,
-        3.,1.,
-        1.,1.
+        2.,7.,
+        9.,0.,
+        2.,4.
     };
     float hB2[] = {
         1.,1.,
-        1.,1.,
+        2.,7.,
         2.,3.
     };
     test(

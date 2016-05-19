@@ -30,14 +30,18 @@ void randn(float *array, int size);
 /*
  * z = x*y
  *
- * yi: row number of y
+ * xi: row number of x
  * xj: column number of x
+ * yi: row number of y
  * yj: column number of y
  * zj: column number of z
- * transpose_opt: 1 --> transpose x
- *                2 --> transpose y
+ * transpose: first   --> transpose x
+ *            second  --> transpose y
+ *            default --> none
  */
-void matrixMul(const float* x, const float*y, float* z, int yi, int xj, int yj, int zj, const int transpose_opt);
+void matrixMul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
+void matrixMulTranposeFirst(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
+void matrixMulTranposeSecond(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
 
 /* 
  * a = a + alpha*outer(x,y)
@@ -50,4 +54,14 @@ void add_outer_prod(float* a, const float* x, const float* y, int nrow, int ncol
  * a += c*(x - y);
  */
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
+
+/*
+ * (a-1)/b + 1
+ */
+__device__ __host__ int CeilDiv(int a, int b);
+
+/*
+ * Randomly initialize `array` of #size with value in [0,1]
+ */
+void randn(float *array, int size);
 #endif
