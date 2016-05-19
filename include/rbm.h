@@ -43,7 +43,7 @@ private:
     void update_c(const float* h_0, const float* h_k);
     void do_contrastive_divergence(const float* v_0);
     void get_h_given_v(float* h, const float* v);
-    void get_v_given_h(const float* h, const float* v, cudaStream_t stream);
+    void get_v_given_h(const float* h, float* v);
     void train(std::vector<float*> training_data, int minibatch_index);
     void init_train_data(std::vector<float*> train_data);
 

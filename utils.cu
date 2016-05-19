@@ -27,16 +27,10 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 __device__ __host__ int CeilDiv(int a, int b) { return (a-1)/b + 1; }
 
 __forceinline__ __device__ float sigmoidf(float in) {
+    // raw approximation to sigmoid function
     return in / (1.f + fabsf(in));  
 }
-__global__ void vectorAdd(float *y, float *a,  float *b, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) y[i] = a[i] + b[i];
-}
-__global__ void sigmoid(float *y, float *a, int n) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if (i < n) y[i] = sigmoidf(a[i]);
-}
+
 __global__
 struct do_sample{
     __host__ __device__
@@ -51,7 +45,7 @@ struct sigmoid{
         return n / (1.f + abs(n));  
     }
 };
-cublasHandle_t& cublasHandle(){
+cublasHandle_t& cublas_handle(){
     static cublasHandle_t handle = NULL;
     if(handle == NULL){
         cublasStatus_t stat;
@@ -69,11 +63,11 @@ void randn(float *array, int size) {
     curandDestroyGenerator(prng);
 }
 // z(m,n) = x(m,k) * y(k,n)
-void matrixMul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
+void matrix_mul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
     float alpha = 1.0, beta = 0.0;
     int m = yj, n = xi, k = yi;
     cublasErrCheck(cublasSgemm(
-        cublasHandle(),
+        cublas_handle(),
         CUBLAS_OP_N,
         CUBLAS_OP_N,
         m, n, k,
@@ -84,11 +78,11 @@ void matrixMul(const float* x, const float*y, float* z, int xi, int xj, int yi, 
         z, zj
     ));
 }
-void matrixMulTranposeFirst(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
+void matrix_mul_tranpose_first(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
     float alpha = 1.0, beta = 0.0;
     int m = yj, n = xj, k = yi;
     cublasErrCheck(cublasSgemm(
-        cublasHandle(),
+        cublas_handle(),
         CUBLAS_OP_N,
         CUBLAS_OP_T,
         m, n, k,
@@ -99,11 +93,11 @@ void matrixMulTranposeFirst(const float* x, const float*y, float* z, int xi, int
         z, zj
     ));
 }
-void matrixMulTranposeSecond(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
+void matrix_mul_tranpose_second(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
     float alpha = 1.0, beta = 0.0;
     int m = yi, n = xi, k = yj;
     cublasErrCheck(cublasSgemm(
-        cublasHandle(),
+        cublas_handle(),
         CUBLAS_OP_T,
         CUBLAS_OP_N,
         m, n, k,
@@ -129,7 +123,7 @@ __global__ void add_diff(float* a, const float* x, const float* y, const float c
 void add_outer_prod(float* a, const float* x, const float* y, int nrow, int ncol, float alpha){
     cublasStatus_t stat;
     stat = cublasSger(
-        cublasHandle(),
+        cublas_handle(),
         ncol, nrow,
         &alpha,
         y, 1,

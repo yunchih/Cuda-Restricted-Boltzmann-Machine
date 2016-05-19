@@ -45,23 +45,22 @@ void RBM::do_contrastive_divergence(const float* v_0){
 }
 void RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
-    // matrixMul(const float* x, const float*y, float* z, int yi, int xj, int yj, int zj, const int transpose_opt)
-    matrixMul(v, this->pW, h, 1, n_visible, n_hidden);
+    matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
-    add_sigmoid<<<gsize,bsize>>>(h, this->c);
+    add_sigmoid<<<gsize,bsize>>>(h, this->pc, n_hidden);
 }
-void RBM::get_v_given_h(const float* h, const float* v){
+void RBM::get_v_given_h(const float* h, float* v){
     // v = sigmoid(dot(h, W) + b)
     /* Transpose the second matrix */
-    matrixMulTranspose(h, this->pW, v, 1, n_visible, n_hidden, 2); 
+    matrix_mul_tranpose_first(h, this->pW, v, 1, n_hidden, n_visible, n_hidden, n_visible); 
     const int bsize = 128;
-    const int gsize = CeilDiv(n_hidden,bsize);
-    add_sigmoid<<<gsize,bsize>>>(h, this->b);
+    const int gsize = CeilDiv(n_visible,bsize);
+    add_sigmoid<<<gsize,bsize>>>(v, this->pb, n_visible);
 }
 void RBM::train(std::vector<float*> training_data, int minibatch_index){
     for(int i = minibatch_index; i < minibatch_index + minibatch_size; ++i){
-        do_contrastive_divergence(train_data[i]);
+        do_contrastive_divergence(training_data[i]);
         /* calculate cost here */
     }
 }

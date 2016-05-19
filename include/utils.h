@@ -39,9 +39,9 @@ void randn(float *array, int size);
  *            second  --> transpose y
  *            default --> none
  */
-void matrixMul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
-void matrixMulTranposeFirst(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
-void matrixMulTranposeSecond(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
+void matrix_mul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
+void matrix_mul_tranpose_first(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
+void matrix_mul_tranpose_second(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj);
 
 /* 
  * a = a + alpha*outer(x,y)
@@ -54,6 +54,11 @@ void add_outer_prod(float* a, const float* x, const float* y, int nrow, int ncol
  * a += c*(x - y);
  */
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
+
+/* 
+ * x += sigmoid(x + y);
+ */
+__global__ void add_sigmoid(float* x, const float* y, int size);
 
 /*
  * (a-1)/b + 1
