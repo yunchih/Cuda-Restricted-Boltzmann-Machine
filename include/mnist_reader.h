@@ -5,13 +5,6 @@
 //  http://opensource.org/licenses/MIT)
 //=======================================================================
 
-/*!
- * \file
- * \brief Contains functions to read the MNIST dataset (less features, Visual Studio friendly)
- *
- * This header should only be used with old compilers.
- */
-
 #ifndef MNIST_READER_HPP
 #define MNIST_READER_HPP
 
@@ -21,61 +14,84 @@
 #include <cstdint>
 #include <memory>
 
-#include "mnist_reader_helper.hpp"
+class MnistReader {
 
-namespace mnist {
+private:
+    char* buffer;
 
-/*!
- * \brief Read a MNIST image file and return a container filled with the images
- * \param path The path to the image file
- * \return A std::vector filled with the read images
- */
-void read_mnist_info(const std::string& path, int& num_imgs, int& size_img, unsigned char* buffer) {
-    auto buffer = read_mnist_file(path, 0x803);
-
-    if (buffer) {
-        num_imgs = read_header(buffer, 1);
-        // size of each img = rows * columns
-        size = read_header(buffer, 2) * read_header(buffer, 3);
-        // Skip the header
-        // Cast to unsigned char is necessary cause signedness of char is platform-specific
-        buffer = reinterpret_cast<unsigned char*>(buffer.get() + 16);
+    uint32_t read_header(size_t position) {
+        auto header = reinterpret_cast<uint32_t*>(this->buffer);
+        auto value = *(header + position);
+        return (value << 24) | ((value << 8) & 0x00FF0000) | ((value >> 8) & 0X0000FF00) | (value >> 24);
     }
-    else {
-        num_imgs = 0;
-        size     = 0;
-        buffer   = nullptr;
+
+    void read_mnist_file(const std::string& path, uint32_t key) {
+        std::ifstream file;
+        file.open(path, std::ios::in | std::ios::binary | std::ios::ate);
+
+        if (!file) {
+            std::cout << "Error opening file" << std::endl;
+            exit(1);
+        }
+
+        auto size = file.tellg();
+        this->buffer = new char(size);
+
+        //Read the entire file at once
+        file.seekg(0, std::ios::beg);
+        file.read(this->buffer, size);
+        file.close();
+
+        auto magic = read_header(0);
+
+        if (magic != key) {
+            std::cout << "Invalid magic number, probably not a MNIST file" << std::endl;
+            exit(1);
+        }
+
+        auto count = read_header(1);
+
+        if (magic == 0x803) {
+            auto rows    = read_header(2);
+            auto columns = read_header(3);
+
+            if (size < count * rows * columns + 16) {
+                std::cout << "The file is not large enough to hold all the data, probably corrupted" << std::endl;
+                exit(1);
+            }
+        } else if (magic == 0x801) {
+            if (size < count + 8) {
+                std::cout << "The file is not large enough to hold all the data, probably corrupted" << std::endl;
+                exit(1);
+            }
+        }
     }
-}
 
-/*!
- * \brief Read a MNIST label file and return a container filled with the labels
- * \param path The path to the image file
- * \return A std::vector filled with the read labels
- */
-void read_mnist_label_file(const std::string& path) {
-    auto buffer = read_mnist_file(path, 0x801);
+public:
+    ~MnistReader(){
 
-    if (buffer) {
-        auto count = read_header(buffer, 1);
-
-        //Skip the header
-        //Cast to unsigned char is necessary cause signedness of char is
-        //platform-specific
-        // auto label_buffer = reinterpret_cast<unsigned char*>(buffer.get() + 8);
-
-        // std::vector<Label> labels(count);
-
-        // for (size_t i = 0; i < count; ++i) {
-            // auto label = *label_buffer++;
-            // labels[i]  = static_cast<Label>(label);
-        // }
-
-        return labels;
     }
-}
+    void read_mnist_info(const std::string& path, int& num_imgs, int& size_img) {
+        read_mnist_file(path, 0x803);
 
-} //end of namespace mnist
+        if (this->buffer) {
+            num_imgs = read_header(1);
+            // size of each img = rows * columns
+            size_img = read_header(2) * read_header(3);
+            // Skip the header
+            this->buffer += 16;
+        }
+        else {
+            num_imgs     = 0;
+            size_img     = 0;
+            this->buffer = nullptr;
+        }
+    }
+
+    const unsigned char* read_img_minibatch(int minibatch_index, int minibatch_size){
+        return (unsigned char*)buffer + minibatch_index*minibatch_size;
+    };
+};
 
 #endif
 
