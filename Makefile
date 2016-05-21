@@ -7,9 +7,9 @@ INC_DIR   = include
 NVCC      = nvcc
 CXXFLAGS  = 
 INC       = -I$(INC_DIR)
-LIBS      = -lcublas -lcurand -lm
+LIBS      = -lcublas -lcublas_device -lcudadevrt -lcurand -lm
 OPTIMIZE  = -O2
-NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 -arch=sm_30 $(INC) $(OPTIMIZE)
+NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 -arch=sm_35 $(INC) $(OPTIMIZE)
 
 # Target
 MAIN     = main.cpp
