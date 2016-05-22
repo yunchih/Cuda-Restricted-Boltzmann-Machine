@@ -1,22 +1,28 @@
 #include "rbm.h"
 #include "utils.h"
 
+/*
+ *   ==========================
+ *   Helper function prototypes
+ *   ==========================
+ */
 template <bool do_sample>
 __global__ void add_sigmoid(float* x, const float* y, int size, curandState* rngs);
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
+__global__ void vec_sample(float* v, int size, curandState* rngs);
 __forceinline__ __device__ float sample( float v, curandState* globalState );
 __forceinline__ __device__ float sigmoidf(float in);
+/*
+ *  ===========================
+ */
 
 RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, int _n_epoch, int _minibatch_size):
     n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate),
     n_cd_iter(_n_cd_iter), n_epoch(_n_epoch), minibatch_size(_minibatch_size){
 
-    W = thrust::device_malloc<float>(_n_visible * _n_hidden);
-    b = thrust::device_malloc<float>(_n_visible);
-    c = thrust::device_malloc<float>(_n_hidden);
-    pW = thrust::raw_pointer_cast(W);
-    pb = thrust::raw_pointer_cast(b);
-    pc = thrust::raw_pointer_cast(c);
+    cudaMalloc((void**)&pW, _n_visible*_n_hidden*sizeof(float));
+    cudaMalloc((void**)&pb, _n_visible*sizeof(float));
+    cudaMalloc((void**)&pc, _n_hidden*sizeof(float));
     randn(pW, _n_visible * _n_hidden);
     randn(pb, _n_visible);
     randn(pc, _n_hidden);
@@ -25,7 +31,6 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, in
     cudaMalloc((void**)&rngs, std::max(_n_visible, _n_hidden) * sizeof(curandState));
     setup_random_numbers<<<1,std::max(_n_visible, _n_hidden)>>>(rngs, time(NULL));
 }
-
 void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k){
     // W += learning_rate * (outer(h_0, v_0) - outer(h_k, v_k))
     add_outer_prod(this->pW, h_0, v_0, n_hidden, n_visible,  learning_rate);
@@ -50,7 +55,8 @@ void RBM::do_contrastive_divergence(const float* v_0){
         cudaMalloc((void**) &h_k, sizeof(float)*n_hidden);
         cudaMalloc((void**) &h_0, sizeof(float)*n_hidden);
     }
-
+    /*
+    // CD-k
     // Initial hidden unit sampling: h0
     get_h_given_v<true>( h_0, v_0 );
     get_v_given_h<true>( h_k, v_k );
@@ -64,17 +70,33 @@ void RBM::do_contrastive_divergence(const float* v_0){
     }
 
     get_h_given_v<false>( h_k, v_k );
+    */
+
+    // CD-1
+    /* see machinelearning.org/archive/icml2008/papers/601.pdf */ 
+
+    float* h_s = NULL;
+    /* positive phase */
+    get_h_given_v<false>( h_0, v_0 );        /* h_0  <- sigmoid(W*v_0 + c) */
+
+    /* negative phase: CD-1 */
+    sample_h(h_s, h_0);                      /* h_s  ~ sigmoid(W*v_0 + c) */
+    get_v_given_h<true>( h_s, v_k );         /* v_k  ~ sigmoid(W*h_s + b) */
+    get_h_given_v<false>( h_k, v_k );        /* h_k <- sigmoid(W*v_k + c) */
 
     this->update_w( h_0, v_0, h_k, v_k );
     this->update_b( v_0, v_k );
     this->update_c( h_0, h_k );
 }
-void RBM::train(float* training_data, int train_data_size){
-    for(int i = 0; i < minibatch_index + minibatch_size; ++i){
-        do_contrastive_divergence(training_data[i]);
+
+void RBM::train(float* training_data, int total){
+    for(int i = 0; i < total; ++i){
+        float* cur_data = training_data + i*n_visible*sizeof(float);
+        do_contrastive_divergence(cur_data);
         /* calculate cost here */
     }
 }
+
 void RBM::init_train_data(std::vector<float*> train_data){
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     shuffle (train_data.begin(), train_data.end(), std::default_random_engine(seed));
@@ -85,24 +107,35 @@ __global__ void add_diff(float* a, const float* x, const float* y, const float c
     if( i < size )
         a[i] += c*(x[i] - y[i]);
 }
+/*
+ * make a sample out of h_0 (the pdf of hidden state)
+ */
+void RBM::sample_h(float* h_s, const float* h_0){
+    cudaMemcpy(h_s, h_0, sizeof(float)*n_hidden, cudaMemcpyDeviceToDevice);
+    const int bsize = 128;
+    const int gsize = CeilDiv(n_hidden,bsize);
+    vec_sample<<<gsize,bsize>>>(h_s, n_hidden, this->rngs);
+}
 
 template <bool do_sample>
-void RBM::get_h_given_v(float* h, const float* v){
+float* RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
     matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
     add_sigmoid<do_sample><<<gsize,bsize>>>(h, this->pc, n_hidden, this->rngs);
+    return h;
 }
 
 template <bool do_sample>
-void RBM::get_v_given_h(const float* h, float* v){
+float* RBM::get_v_given_h(const float* h, float* v){
     // v = sigmoid(dot(h, W) + b)
     /* Transpose the second matrix */
     matrix_mul_tranpose_first(h, this->pW, v, 1, n_hidden, n_visible, n_hidden, n_visible); 
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
     add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pb, n_visible, this->rngs);
+    return v;
 }
 
 /*
@@ -111,13 +144,25 @@ void RBM::get_v_given_h(const float* h, float* v){
  * =-=-=-=-=-=-=-=-=-=-=-=-=-=
  */
 
-// x = sigmoid(x + y)
+/*
+ * x = sigmoid(x + y)
+ */
 template <bool do_sample>
 __global__ void add_sigmoid(float* x, const float* y, int size, curandState* rngs){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if( i < size ){
         float v = sigmoidf(x[i] + y[i]);
         x[i] = do_sample ? sample(v, &(rngs[i])) : v;
+    }
+}
+
+/*
+ * Apply Bernoulli sampling on vector v
+ */
+__global__ void vec_sample(float* v, int size, curandState* rngs){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if( i < size ){
+        v[i] = sample(v[i], &(rngs[i]));
     }
 }
 
