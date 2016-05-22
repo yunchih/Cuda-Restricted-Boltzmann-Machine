@@ -26,25 +26,6 @@ void curandErrCheck_(curandStatus_t stat, const char *file, int line) {
 
 __device__ __host__ int CeilDiv(int a, int b) { return (a-1)/b + 1; }
 
-__forceinline__ __device__ float sigmoidf(float in) {
-    // raw approximation to sigmoid function
-    return in / (1.f + fabsf(in));  
-}
-
-__global__
-struct do_sample{
-    __host__ __device__
-    int operator()(const float n) const{
-        return n > 0.5;  
-    }
-};
-__global__
-struct sigmoid{
-    __host__ __device__
-    float operator()(const float n) const{
-        return n / (1.f + abs(n));  
-    }
-};
 cublasHandle_t& cublas_handle(){
     static cublasHandle_t handle = NULL;
     if(handle == NULL){
@@ -54,13 +35,6 @@ cublasHandle_t& cublas_handle(){
             errx(1, "CUBLAS initialization failed\n");
     }
     return handle;
-}
-void randn(float *array, int size) {
-    curandGenerator_t prng;
-    curandCreateGenerator(&prng, CURAND_RNG_PSEUDO_DEFAULT);
-    curandSetPseudoRandomGeneratorSeed(prng, (unsigned long long) clock());
-    curandGenerateUniform(prng, array, size);
-    curandDestroyGenerator(prng);
 }
 // z(m,n) = x(m,k) * y(k,n)
 void matrix_mul(const float* x, const float*y, float* z, int xi, int xj, int yi, int yj, int zj){
@@ -108,17 +82,6 @@ void matrix_mul_tranpose_second(const float* x, const float*y, float* z, int xi,
         z, zj
     ));
 }
-// x = sigmoid(x + y)
-__global__ void add_sigmoid(float* x, const float* y, int size){
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if( i < size )
-        x[i] += sigmoidf(x[i] + y[i]);
-}
-__global__ void add_diff(float* a, const float* x, const float* y, const float c, int size){
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    if( i < size )
-        a[i] += c*(x[i] - y[i]);
-}
 // a = a + outer(x,y)
 void add_outer_prod(float* a, const float* x, const float* y, int nrow, int ncol, float alpha){
     cublasStatus_t stat;
@@ -133,3 +96,16 @@ void add_outer_prod(float* a, const float* x, const float* y, int nrow, int ncol
     if(stat != CUBLAS_STATUS_SUCCESS)
         errx(1,"CUBLAS outer prodduct error\n");
 }
+
+void randn(float *array, int size) {
+    curandGenerator_t prng;
+    curandCreateGenerator(&prng, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(prng, (unsigned long long) clock());
+    curandGenerateUniform(prng, array, size);
+    curandDestroyGenerator(prng);
+}
+__global__ void setup_random_numbers(curandState * state, unsigned long seed){
+    int id = threadIdx.x;
+    curand_init ( seed, id, 0, &state[id] );
+} 
+

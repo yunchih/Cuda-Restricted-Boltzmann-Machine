@@ -5,11 +5,12 @@ INC_DIR   = include
 
 # Flags
 NVCC      = nvcc
-CXXFLAGS  = 
+CXXFLAGS  =
+ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
-LIBS      = -lcublas -lcublas_device -lcudadevrt -lcurand -lm
+LIBS      = -lcublas -lcurand -lm #-lcublas_device -lcudadevrt 
 OPTIMIZE  = -O2
-NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 -arch=sm_35 $(INC) $(OPTIMIZE)
+NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 $(ARCH) $(INC) $(OPTIMIZE)
 
 # Target
 MAIN     = main.cpp
