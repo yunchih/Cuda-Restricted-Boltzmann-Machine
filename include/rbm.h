@@ -8,6 +8,7 @@
 #include <random>
 #include <chrono>  
 #include "utils.h"
+#include "mnist_reader.h"
 
 #define CHECK {\
     auto e = cudaDeviceSynchronize();\
@@ -22,7 +23,7 @@ class RBM {
 
 public:
     RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, int _n_epoch, int _minibatch_size);
-    void train(float* training_data, int total);
+    void train(MnistReader& reader);
 
 private:
     void update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k);

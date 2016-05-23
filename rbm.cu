@@ -89,9 +89,10 @@ void RBM::do_contrastive_divergence(const float* v_0){
     this->update_c( h_0, h_k );
 }
 
-void RBM::train(float* training_data, int total){
+void RBM::train(MnistReader& reader){
+    int total = reader.get_total();
     for(int i = 0; i < total; ++i){
-        float* cur_data = training_data + i*n_visible*sizeof(float);
+        const float* cur_data = reader.get_example_at(i);
         do_contrastive_divergence(cur_data);
         /* calculate cost here */
     }

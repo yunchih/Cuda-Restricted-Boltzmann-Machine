@@ -104,8 +104,22 @@ void randn(float *array, int size) {
     curandGenerateUniform(prng, array, size);
     curandDestroyGenerator(prng);
 }
+
 __global__ void setup_random_numbers(curandState * state, unsigned long seed){
     int id = threadIdx.x;
     curand_init ( seed, id, 0, &state[id] );
 } 
 
+__global__ void transform_example_kernel(float* to, char* from, int size){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if( i < size ){
+        to[i] = ((float)(from[i])) * 2.0f / 255.0f - 1.0f;
+    }
+}
+
+void transform_example(float* gpu_buffer, char* gpu_tmp, char* cpu_buffer, int size){
+    const int bsize = 128;
+    const int gsize = CeilDiv(size,bsize);
+    cudaMemcpy(gpu_tmp, cpu_buffer, size, cudaMemcpyHostToDevice);
+    transform_example_kernel<<<bsize, gsize>>>(gpu_buffer, gpu_tmp, size);
+}
