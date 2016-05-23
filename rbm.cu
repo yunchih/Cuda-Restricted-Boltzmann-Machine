@@ -1,5 +1,4 @@
 #include "rbm.h"
-#include "utils.h"
 
 /*
  *   ==========================
@@ -13,12 +12,18 @@ __global__ void vec_sample(float* v, int size, curandState* rngs);
 __forceinline__ __device__ float sample( float v, curandState* globalState );
 __forceinline__ __device__ float sigmoidf(float in);
 /*
- *  ===========================
+ * Helper struct used to compute square error
  */
+struct Square_diff{
+    __host__ __device__ float operator()(const float &lhs, const float &rhs) const {
+        return (lhs - rhs)*(lhs - rhs);
+    }
+};
+/*   ===========================   */
 
-RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, int _n_epoch, int _minibatch_size):
-    n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate),
-    n_cd_iter(_n_cd_iter), n_epoch(_n_epoch), minibatch_size(_minibatch_size){
+RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, MnistReader& _reader):
+    n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), n_epoch(_n_epoch),
+    reader(_reader){
 
     cudaMalloc((void**)&pW, _n_visible*_n_hidden*sizeof(float));
     cudaMalloc((void**)&pb, _n_visible*sizeof(float));
@@ -27,9 +32,22 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_cd_iter, in
     randn(pb, _n_visible);
     randn(pc, _n_hidden);
 
+    n_train_data = reader.get_total();
+
     // Random number states used in sampling hidden/visible states
     cudaMalloc((void**)&rngs, std::max(_n_visible, _n_hidden) * sizeof(curandState));
     setup_random_numbers<<<1,std::max(_n_visible, _n_hidden)>>>(rngs, time(NULL));
+}
+RBM::~RBM(){
+
+    cudaFree(pW);
+    cudaFree(pb);
+    cudaFree(pc);
+    cudaFree(rngs);
+
+    // Free the memory allocated in these functions
+    calculate_cost_each(NULL);
+    do_contrastive_divergence(NULL);
 }
 void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k){
     // W += learning_rate * (outer(h_0, v_0) - outer(h_k, v_k))
@@ -55,6 +73,13 @@ void RBM::do_contrastive_divergence(const float* v_0){
         cudaMalloc((void**) &h_k, sizeof(float)*n_hidden);
         cudaMalloc((void**) &h_0, sizeof(float)*n_hidden);
     }
+    if(v_0 == NULL && v_k){
+        cudaFree(v_k);
+        cudaFree(h_k);
+        cudaFree(h_0);
+        return;
+    }
+    
     /*
     // CD-k
     // Initial hidden unit sampling: h0
@@ -89,20 +114,55 @@ void RBM::do_contrastive_divergence(const float* v_0){
     this->update_c( h_0, h_k );
 }
 
-void RBM::train(MnistReader& reader){
-    int total = reader.get_total();
-    for(int i = 0; i < total; ++i){
-        const float* cur_data = reader.get_example_at(i);
-        do_contrastive_divergence(cur_data);
+void RBM::train(){
+    for(int i = 0; i < this->n_epoch; ++i){
+        train_step();
         /* calculate cost here */
+        float cost = calculate_cost();
+        std::cout.precision(3);
+        std::cout << "[epoch = " << std::setw(3) << i+1 << "] error: " << cost << std::endl;
     }
 }
-
-void RBM::init_train_data(std::vector<float*> train_data){
-    unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
-    shuffle (train_data.begin(), train_data.end(), std::default_random_engine(seed));
+void RBM::train_step(){
+    for(int i = 0; i < this->n_train_data; ++i){
+        const float* cur_data = reader.get_example_at(i);
+        do_contrastive_divergence(cur_data);
+    }
 }
+float RBM::calculate_cost(){
+    const int random_sample = 5;
+    float mean_cost = 0.0;
+    std::srand(std::time(0));
+    for(int i = 0; i < random_sample; ++i){
+        int rand_i = std::rand() % n_train_data;
+        const float* rand_data = reader.get_example_at(rand_i);
+        mean_cost += calculate_cost_each(rand_data);
+    }
+    return mean_cost / (float)random_sample;
+}
+float RBM::calculate_cost_each(const float* v_0){
 
+
+    static thrust::device_ptr<float> h_s, v_r;
+    if(thrust::raw_pointer_cast(h_s) == NULL){
+        v_r = thrust::device_malloc<float>(n_visible);
+        h_s = thrust::device_malloc<float>(n_hidden);
+    }
+    if(v_0 == NULL && thrust::raw_pointer_cast(v_r) != NULL){
+        thrust::device_free(v_r);
+        thrust::device_free(h_s);
+        return 0.0;
+    }
+    
+    get_h_given_v<true>( thrust::raw_pointer_cast(h_s), thrust::raw_pointer_cast(v_0) );  /* h_s  ~ sigmoid(W*v_0 + c) */
+    /* reconstruction */
+    get_v_given_h<false>( thrust::raw_pointer_cast(h_s), thrust::raw_pointer_cast(v_r) ); /* v_r  <- sigmoid(W*h_s + b) */
+    
+    // cost = sqrt(sum((v_r - v_0)^2)/n)
+    thrust::transform(thrust::device, v_r, v_r + n_visible, v_0, v_r, Square_diff());
+    float sum = thrust::reduce(thrust::device, v_r, v_r + n_visible);
+    return sqrt(sum/n_visible);
+}
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if( i < size )

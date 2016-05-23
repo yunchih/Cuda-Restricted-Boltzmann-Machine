@@ -21,11 +21,12 @@ private:
     char* cpu_buffer;
     float* gpu_buffer;
     char* gpu_tmp;
+    char* header;
     int each_size;
-    int total_num;
+    int data_num;
 
     uint32_t read_header_field(size_t position) {
-        auto header = reinterpret_cast<uint32_t*>(this->cpu_buffer);
+        auto header = reinterpret_cast<uint32_t*>(this->header);
         auto value = *(header + position);
         return (value << 24) | ((value << 8) & 0x00FF0000) | ((value >> 8) & 0X0000FF00) | (value >> 24);
     }
@@ -40,11 +41,11 @@ private:
         }
 
         auto size = file.tellg();
-        this->cpu_buffer = new char(size);
+        this->header = new char(16);
 
-        //Read the entire file at once
+        //Read the header
         file.seekg(0, std::ios::beg);
-        file.read(this->cpu_buffer, size);
+        file.read(this->header, 16);
         file.close();
 
         auto magic = read_header_field(0);
@@ -54,25 +55,30 @@ private:
             exit(1);
         }
 
-        total_num = read_header_field(1);
+        int avail_data_num = read_header_field(1);
+
+        if( avail_data_num < data_num ){
+            std::cerr << "Request data size [" << data_num << "] exceed size of available data" << std::endl;
+            exit(1);
+        }
 
         /* Training data */
         if (magic == 0x803) {
             /* size = row * column */
             each_size =  read_header_field(2) * read_header_field(3);
 
-            if (size < total_num * each_size + 16) {
+            if (size < avail_data_num * each_size + 16) {
                 std::cerr << "The file is not large enough to hold all the data, probably corrupted" << std::endl;
                 exit(1);
             }
         /* Label data */
-        } else if (magic == 0x801) {
+        } 
+        else if (magic == 0x801) {
             std::cerr << in_file << " looks like a label dataset, which is not supported now" << std::endl;
             exit(1);
         }
 
-        /* Skip the header and proceed to next memory position */
-        this->cpu_buffer += 16;
+        this->cpu_buffer = new char(data_num*each_size);
     }
 
 public:
@@ -83,9 +89,9 @@ public:
     }
 
     int get_total(){
-        return total_num;
+        return data_num;
     }
-    MnistReader(const char* _file){
+    MnistReader(const char* _file, int _data_num):data_num(_data_num){
         read_mnist_meta(_file);
         // allocate single train data
         cudaMalloc((void**)gpu_buffer, sizeof(float)*each_size);

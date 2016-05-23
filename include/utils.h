@@ -65,4 +65,5 @@ __global__ void setup_random_numbers(curandState * state, unsigned long seed);
  * Transform (normalize) one example from [0,255] to [0,1]
  */
 void transform_example(float* gpu_buffer, char* gpu_tmp, char* cpu_buffer, int size);
+
 #endif
