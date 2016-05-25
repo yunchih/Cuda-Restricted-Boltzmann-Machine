@@ -1,10 +1,3 @@
-//=======================================================================
-// Copyright (c) 2014-2016 Baptiste Wicht
-// Distributed under the terms of the MIT License.
-// (See accompanying file LICENSE or copy at
-//  http://opensource.org/licenses/MIT)
-//=======================================================================
-
 #ifndef MNIST_READER_HPP
 #define MNIST_READER_HPP
 
@@ -14,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include "utils.h"
+#include "throw_error.h"
 
 class MnistReader {
 
@@ -36,7 +30,7 @@ private:
         file.open(in_file, std::ios::in | std::ios::binary | std::ios::ate);
 
         if (!file) {
-            std::cerr << "Error opening file" << std::endl;
+            throw_error_with_reason("Fail opening file: " << in_file);
             exit(1);
         }
 
@@ -51,30 +45,29 @@ private:
         auto magic = read_header_field(0);
 
         if (magic != 0x801 && magic != 0x803) {
-            std::cerr << "Invalid magic number, probably not a MNIST file" << std::endl;
+            throw_error("Invalid magic number, probably not a MNIST file");
             exit(1);
         }
 
         int avail_data_num = read_header_field(1);
 
         if( avail_data_num < data_num ){
-            std::cerr << "Request data size [" << data_num << "] exceed size of available data" << std::endl;
+            throw_error("Request data size [" << data_num << "] exceed size of available data");
             exit(1);
         }
-
         /* Training data */
         if (magic == 0x803) {
             /* size = row * column */
             each_size =  read_header_field(2) * read_header_field(3);
 
             if (size < avail_data_num * each_size + 16) {
-                std::cerr << "The file is not large enough to hold all the data, probably corrupted" << std::endl;
+                throw_error("The file is not large enough to hold all the data, probably corrupted");
                 exit(1);
             }
         /* Label data */
         } 
         else if (magic == 0x801) {
-            std::cerr << in_file << " looks like a label dataset, which is not supported now" << std::endl;
+            throw_error(in_file << " looks like a label dataset, which is not supported now");
             exit(1);
         }
 
@@ -87,16 +80,15 @@ public:
         cudaFree((void*)gpu_tmp);
         delete [] this->cpu_buffer;
     }
-
     int get_total(){
         return data_num;
     }
     MnistReader(const char* _file, int _data_num):data_num(_data_num){
         read_mnist_meta(_file);
-        // allocate single train data
-        cudaMalloc((void**)gpu_buffer, sizeof(float)*each_size);
-        // allocate buffer for cpu -> gpu transformation
-        cudaMalloc((void**)gpu_tmp, sizeof(char)*each_size);
+        // allocate space for single train data
+        cudaMalloc((void**)&gpu_buffer, sizeof(float)*each_size);
+        // allocate space for cpu -> gpu transformation temporary buffer
+        cudaMalloc((void**)&gpu_tmp, sizeof(char)*each_size);
     }
     const float* get_example_at(int pos){
         char* p = this->cpu_buffer + each_size * pos;

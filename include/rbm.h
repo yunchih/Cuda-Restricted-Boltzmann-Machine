@@ -8,6 +8,7 @@
 #include <thrust/functional.h>
 #include <thrust/reduce.h>
 #include <thrust/execution_policy.h>
+#include <cublas_v2.h>
 #include <algorithm>
 #include <random>
 #include <cstdlib>
@@ -26,7 +27,6 @@
 }
 
 class RBM {
-
 
 public:
     RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, MnistReader& _reader);

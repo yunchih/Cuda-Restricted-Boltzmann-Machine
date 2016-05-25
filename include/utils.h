@@ -66,4 +66,12 @@ __global__ void setup_random_numbers(curandState * state, unsigned long seed);
  */
 void transform_example(float* gpu_buffer, char* gpu_tmp, char* cpu_buffer, int size);
 
+void cudaErrCheck_(cudaError_t stat, const char *file, int line);
+void cublasErrCheck_(cublasStatus_t stat, const char *file, int line);
+void curandErrCheck_(curandStatus_t stat, const char *file, int line);
+#define cudaErrCheck(stat) do{ cudaErrCheck_((stat), __FILE__, __LINE__); }while(0)
+#define cublasErrCheck(stat) do{ cublasErrCheck_((stat), __FILE__, __LINE__); }while(0)
+#define curandErrCheck(stat) do{ curandErrCheck_((stat), __FILE__, __LINE__); }while(0)
+#define KERNEL_CHECK do{ cudaErrCheck_(cudaDeviceSynchronize(), __FILE__, __LINE__);}while(0)
+
 #endif
