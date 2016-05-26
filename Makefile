@@ -10,7 +10,7 @@ DEBUG     = -g -DDEBUG
 ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
 LIBS      = -lcublas -lcurand -lm #-lcublas_device -lcudadevrt 
-OPTIMIZE  = -O2
+OPTIMIZE  = #-O2
 NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 $(ARCH) $(INC) $(OPTIMIZE) $(DEBUG)
 
 # Target

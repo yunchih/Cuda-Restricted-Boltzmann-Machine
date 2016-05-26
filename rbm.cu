@@ -1,5 +1,6 @@
 #include "rbm.h"
 #include "debug.h"
+#include "messages.h"
 
 /*
  *   ==========================
@@ -124,7 +125,7 @@ void RBM::train(){
         /* calculate cost here */
         float cost = calculate_cost();
         std::cout.precision(3);
-        std::cout << "[epoch = " << std::setw(3) << i+1 << "] error: " << cost << std::endl;
+        print_train_error(i+1, cost);
     }
 }
 void RBM::train_step(){

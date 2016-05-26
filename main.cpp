@@ -1,6 +1,6 @@
 #include "rbm.h"
 #include "colors.h"
-#include "throw_error.h"
+#include "messages.h"
 #include <iostream>
 #include <iomanip>
 #include <sys/types.h>
@@ -40,7 +40,7 @@ int main(int argc, char *argv[])
     std::cout << std::setw(20) << "[Learning rate]"    << " = " << learning_rate   << std::endl;
     std::cout << std::setw(20) << "[Epoch number]"     << " = " << n_epoch         << std::endl;
     std::cout << std::setw(20) << "[Train data size]"  << " = " << train_size      << std::endl;
-    std::cout << COLOR_NORMAL;
+    std::cout << COLOR_NORMAL << std::endl;
 
     MnistReader reader(train_data_file, train_size);
     change_dir(out_dir);

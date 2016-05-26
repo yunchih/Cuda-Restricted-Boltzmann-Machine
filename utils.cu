@@ -1,6 +1,6 @@
 #include "utils.h"
 #include "debug.h"
-#include "throw_error.h"
+#include "messages.h"
 
 __device__ __host__ int CeilDiv(int a, int b) { return (a-1)/b + 1; }
 static const char* cublasGetErrorEnum(cublasStatus_t error){
@@ -144,6 +144,5 @@ void transform_example(float* gpu_buffer, char* gpu_tmp, char* cpu_buffer, int s
     const int bsize = 128;
     const int gsize = CeilDiv(size,bsize);
     cudaErrCheck(cudaMemcpy(gpu_tmp, cpu_buffer, size, cudaMemcpyHostToDevice));
-    print_cpu("cpu input data", (const uint8_t*)cpu_buffer, size);
     transform_example_kernel<<<bsize, gsize>>>(gpu_buffer, gpu_tmp, size);
 }
