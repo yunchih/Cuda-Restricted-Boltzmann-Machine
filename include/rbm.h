@@ -16,15 +16,8 @@
 #include <cmath>
 #include <ctime>
 #include "utils.h"
+#include "blas.h"
 #include "mnist_reader.h"
-
-#define CHECK {\
-    auto e = cudaDeviceSynchronize();\
-    if (e != cudaSuccess) {\
-        printf("At " __FILE__ ":%d, %s\n", __LINE__, cudaGetErrorString(e));\
-        abort(); \
-    }\
-}
 
 class RBM {
 
@@ -55,15 +48,13 @@ private:
     int n_epoch, n_train_data;
     float learning_rate;
 
-    /* state variables needed for random number generation */
-    curandState* rngs;
-
     /* pW: _n_visible * _n_hidden matrix */
     /* pb: _n_visible vector */
     /* pc: _n_hidden vector  */
     float *pW, *pb, *pc;
 
     MnistReader reader;
+    Blas blas;
 };
 
 #endif

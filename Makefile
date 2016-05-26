@@ -48,4 +48,7 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [Train data size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.1 1 4
+	./$(EXEC) out data/train-images-idx3-ubyte 0.1 1 2
+
+cycle:
+	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

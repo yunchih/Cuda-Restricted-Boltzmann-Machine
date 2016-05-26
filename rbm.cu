@@ -27,26 +27,30 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, Mnis
     n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), n_epoch(_n_epoch),
     reader(_reader){
 
-    cudaErrCheck(cudaMalloc((void**)&pW, _n_visible*_n_hidden*sizeof(float)));
-    cudaErrCheck(cudaMalloc((void**)&pb, _n_visible*sizeof(float)));
-    cudaErrCheck(cudaMalloc((void**)&pc, _n_hidden*sizeof(float)));
-    randn(pW, _n_visible * _n_hidden);
-    randn(pb, _n_visible);
-    randn(pc, _n_hidden);
+    cudaErrCheck(cudaMalloc((void**)&(this->pW), _n_visible*_n_hidden*sizeof(float)));
+    cudaErrCheck(cudaMalloc((void**)&(this->pb), _n_visible*sizeof(float)));
+    cudaErrCheck(cudaMalloc((void**)&(this->pc), _n_hidden*sizeof(float)));
 
-    n_train_data = reader.get_total();
+    // Initialize weights
+    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, -0.15, 0.15);
+    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pb, _n_visible, .0, .1);
+    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pc, _n_hidden, .0, .1);
+    
+#ifdef DEBUG
+    /*
+    print_gpu("pW", this->pW, _n_visible*_n_hidden); 
+    print_gpu("pb", this->pb, _n_visible); 
+    print_gpu("pc", this->pc, _n_hidden); 
+    */
+#endif
 
-    // Random number states used in sampling hidden/visible states
-    cudaErrCheck(cudaMalloc((void**)&rngs, std::max(_n_visible, _n_hidden) * sizeof(curandState)));
-    setup_random_numbers<<<1,std::max(_n_visible, _n_hidden)>>>(rngs, time(NULL));
-    KERNEL_CHECK;
+    this->n_train_data = reader.get_total();
 }
 RBM::~RBM(){
 
     cudaErrCheck(cudaFree(pW));
     cudaErrCheck(cudaFree(pb));
     cudaErrCheck(cudaFree(pc));
-    cudaErrCheck(cudaFree(rngs));
 
     // Free the memory allocated in these functions
     calculate_cost_each(NULL);
@@ -226,33 +230,48 @@ float* RBM::get_v_given_h(const float* h, float* v){
  * x = sigmoid(x + y)
  */
 template <bool do_sample>
-__global__ void add_sigmoid(float* x, const float* y, int size, curandState* rngs){
+__global__ void add_sigmoid(float* x, const float* y, int size){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if( i < size ){
         float v = sigmoidf(x[i] + y[i]);
-        x[i] = do_sample ? sample(v, &(rngs[i])) : v;
+        x[i] = do_sample ? get_sample(v) : v;
+    }
+}
+
+/*
+ * Fill array with random value in [low,high]
+ */
+__global__ void random_fill_range(float* v, int size, float low, float high){
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if( i < size ){
+        float range = high - low;
+        v[i] = get_rand()*range + low;
     }
 }
 
 /*
  * Apply Bernoulli sampling on vector v
  */
-__global__ void vec_sample(float* v, int size, curandState* rngs){
+__global__ void vec_sample(float* v, int size){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if( i < size ){
-        v[i] = sample(v[i], &(rngs[i]));
+        v[i] = get_sample(v[i]);
     }
 }
 
 /*
- * Sample a Bernoulli sample, return (0.0 or 1.0)
+ * Do a Bernoulli sample
  */
-__forceinline__ __device__ float sample( float v, curandState* globalState ) {
-    int x = threadIdx.x;
-    curandState localState = globalState[x];
-    float rand = curand_uniform(&localState);
-    globalState[x] = localState; 
-    return rand > v ? 0.0 : 1.0;
+__forceinline__ __device__ float get_sample(float f) {
+    return get_rand() > f ? 0.0 : 1.0;
+}
+/*
+ * Get a random number in [0,1]
+ */
+__forceinline__ __device__ float get_rand() {
+    curandState state;
+    curand_init((unsigned long long)clock() + threadIdx.x, 0, 0, &state);
+    return curand_uniform(&state);
 }
 
 /*

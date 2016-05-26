@@ -19,8 +19,8 @@ private:
     int data_num;
 
     struct TransformInput{
-        __host__ __device__ float operator()(const char in) const {
-            return (float)in * 2.0f / 255.0f - 1.0f;
+        __host__ __device__ float operator()(const uint8_t in) const {
+            return (float)in / 255.0f;
         }
     };
 
@@ -81,8 +81,9 @@ private:
         file.read(char_buffer, total_size);
         file.close();
         
+        auto p = (uint8_t*)char_buffer;
         this->cpu_buffer = new float[total_size];
-        thrust::transform(thrust::host, char_buffer, char_buffer + total_size, this->cpu_buffer, TransformInput());
+        thrust::transform(thrust::host, p, p + total_size, this->cpu_buffer, TransformInput());
         delete [] char_buffer; 
     }
 
@@ -107,14 +108,6 @@ public:
         }
 
         float* p = this->cpu_buffer + this->each_size * pos;
-        
-        /*
-        printf("data at %d\n", pos);
-        for(int i = 0; i < this->each_size; ++i )
-            printf("0x%x|", p[i]);
-        puts("");
-        */
-
         cudaErrCheck(cudaMemcpy(this->gpu_buffer, p, sizeof(float)*this->each_size, cudaMemcpyHostToDevice));
         return this->gpu_buffer;
     }

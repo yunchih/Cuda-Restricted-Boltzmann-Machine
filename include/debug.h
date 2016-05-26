@@ -1,6 +1,8 @@
 #ifndef DEBUG_H
 #define DEBUG_H
 
+#include <iostream>
+
 #ifdef DEBUG
 #define print_gpu(name, gpu_array, size){ _print_gpu(name, gpu_array, size, __FILE__, __LINE__); }
 #define print_cpu(name, cpu_array, size){ _print_cpu(name, cpu_array, size, __FILE__, __LINE__); }

@@ -56,16 +56,6 @@ __device__ __host__ int CeilDiv(int a, int b);
  */
 void randn(float *array, int size);
 
-/*
- * Set up random number generator
- */
-__global__ void setup_random_numbers(curandState * state, unsigned long seed);
-
-/*
- * Transform (normalize) one example from [0,255] to [0,1]
- */
-void transform_example(float* gpu_buffer, char* gpu_tmp, char* cpu_buffer, int size);
-
 void cudaErrCheck_(cudaError_t stat, const char *file, int line);
 void cublasErrCheck_(cublasStatus_t stat, const char *file, int line);
 void curandErrCheck_(curandStatus_t stat, const char *file, int line);
