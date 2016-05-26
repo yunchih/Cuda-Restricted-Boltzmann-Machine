@@ -4,11 +4,12 @@
 #include <thrust/device_ptr.h>
 #include <thrust/device_malloc.h>
 #include <thrust/device_free.h>
+#include <thrust/execution_policy.h>
 #include <thrust/transform.h>
 #include <thrust/functional.h>
 #include <thrust/reduce.h>
-#include <thrust/execution_policy.h>
-#include <cublas_v2.h>
+#include <curand_kernel.h>
+#include <cuda.h>
 #include <algorithm>
 #include <random>
 #include <cstdlib>

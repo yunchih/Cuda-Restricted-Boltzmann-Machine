@@ -8,10 +8,12 @@
  *   ==========================
  */
 template <bool do_sample>
-__global__ void add_sigmoid(float* x, const float* y, int size, curandState* rngs);
+__global__ void add_sigmoid(float* x, const float* y, int size);
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
-__global__ void vec_sample(float* v, int size, curandState* rngs);
-__forceinline__ __device__ float sample( float v, curandState* globalState );
+__global__ void vec_sample(float* v, int size);
+__global__ void random_fill_range(float* w, int size, float low, float high);
+__forceinline__ __device__ float get_sample(float f);
+__forceinline__ __device__ float get_rand();
 __forceinline__ __device__ float sigmoidf(float in);
 /*
  * Helper struct used to compute square error
@@ -58,8 +60,9 @@ RBM::~RBM(){
 }
 void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k){
     // W += learning_rate * (outer(h_0, v_0) - outer(h_k, v_k))
-    add_outer_prod(this->pW, h_0, v_0, n_hidden, n_visible,  learning_rate);
-    add_outer_prod(this->pW, h_k, v_k, n_hidden, n_visible, -learning_rate);
+    blas.add_outer_prod(this->pW, h_0, v_0, n_hidden, n_visible,  learning_rate);
+    blas.add_outer_prod(this->pW, h_k, v_k, n_hidden, n_visible, -learning_rate);
+    print_gpu("w after update", this->pW, n_hidden*100); 
 }
 void RBM::update_b(const float* v_0, const float* v_k){
     // b += learning_rate * (v_0 - v_k)
@@ -193,17 +196,18 @@ void RBM::sample_h(float* h_s, const float* h_0){
     cudaErrCheck(cudaMemcpy(h_s, h_0, sizeof(float)*n_hidden, cudaMemcpyDeviceToDevice));
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
-    vec_sample<<<gsize,bsize>>>(h_s, n_hidden, this->rngs);
+    vec_sample<<<gsize,bsize>>>(h_s, n_hidden);
     KERNEL_CHECK;
 }
 
 template <bool do_sample>
 float* RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
-    matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
+    blas.matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
-    add_sigmoid<do_sample><<<gsize,bsize>>>(h, this->pc, n_hidden, this->rngs);
+    print_gpu("h after multiplying W", h, 100); 
+    add_sigmoid<do_sample><<<gsize,bsize>>>(h, this->pc, n_hidden);
     KERNEL_CHECK;
     return h;
 }
@@ -212,10 +216,10 @@ template <bool do_sample>
 float* RBM::get_v_given_h(const float* h, float* v){
     // v = sigmoid(dot(h, W) + b)
     /* Transpose the second matrix */
-    matrix_mul_tranpose_first(h, this->pW, v, 1, n_hidden, n_visible, n_hidden, n_visible); 
+    blas.matrix_mul_tranpose_first(h, this->pW, v, 1, n_hidden, n_visible, n_hidden, n_visible); 
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
-    add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pb, n_visible, this->rngs);
+    add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pb, n_visible);
     KERNEL_CHECK;
     return v;
 }
