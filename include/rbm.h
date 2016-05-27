@@ -10,6 +10,7 @@
 #include <thrust/reduce.h>
 #include <curand_kernel.h>
 #include <cuda.h>
+#include <cassert>
 #include <algorithm>
 #include <random>
 #include <cstdlib>

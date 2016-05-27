@@ -38,13 +38,9 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, Mnis
     random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pb, _n_visible, .0, .1);
     random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pc, _n_hidden, .0, .1);
     
-#ifdef DEBUG
-    /*
-    print_gpu("pW", this->pW, _n_visible*_n_hidden); 
-    print_gpu("pb", this->pb, _n_visible); 
-    print_gpu("pc", this->pc, _n_hidden); 
-    */
-#endif
+    assert(!has_nan(this->pW, n_visible*n_hidden));
+    assert(!has_nan(this->pb, n_visible));
+    assert(!has_nan(this->pc, n_hidden));
 
     this->n_train_data = reader.get_total();
 }
@@ -62,7 +58,9 @@ void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const f
     // W += learning_rate * (outer(h_0, v_0) - outer(h_k, v_k))
     blas.add_outer_prod(this->pW, h_0, v_0, n_hidden, n_visible,  learning_rate);
     blas.add_outer_prod(this->pW, h_k, v_k, n_hidden, n_visible, -learning_rate);
-    print_gpu("w after update", this->pW, n_hidden*100); 
+    assert(!has_nan(this->pW, n_visible*n_hidden));
+    /* print_gpu("w after update", this->pW, 100);  */
+
 }
 void RBM::update_b(const float* v_0, const float* v_k){
     // b += learning_rate * (v_0 - v_k)
@@ -70,6 +68,7 @@ void RBM::update_b(const float* v_0, const float* v_k){
     const int gsize = CeilDiv(n_visible,bsize);
     add_diff<<<gsize,bsize>>>(this->pb, v_0, v_k, learning_rate, n_visible);
     KERNEL_CHECK;
+    assert(!has_nan(this->pb, n_visible));
 }
 void RBM::update_c(const float* h_0, const float* h_k){
     // c += learning_rate * (h_0 - h_k)
@@ -77,6 +76,7 @@ void RBM::update_c(const float* h_0, const float* h_k){
     const int gsize = CeilDiv(n_hidden,bsize);
     add_diff<<<gsize,bsize>>>(this->pc, h_0, h_k, learning_rate, n_hidden);
     KERNEL_CHECK;
+    assert(!has_nan(this->pc, n_hidden));
 }
 void RBM::do_contrastive_divergence(const float* v_0){
     static float *v_k = NULL, *h_k = NULL, *h_0 = NULL;
@@ -138,7 +138,6 @@ void RBM::train(){
 void RBM::train_step(){
     for(int i = 0; i < this->n_train_data; ++i){
         const float* cur_data = reader.get_example_at(i);
-        /* print_gpu("cur_data", cur_data, n_visible, float);  */
         do_contrastive_divergence(cur_data);
     }
 }
@@ -172,9 +171,14 @@ float RBM::calculate_cost_each(const float* v_0){
     thrust::device_ptr<float> dv_r(v_r);
     thrust::device_ptr<float> dh_s(h_s);
     thrust::device_ptr<const float> dv_0(v_0);
-    /* print_gpu("v_r", v_r, n_visible, float);  */
+
+#ifdef DEBUG
+    /* print_gpu("h_s", h_s, n_hidden);  */
+    /* print_gpu("v_r", v_r, n_visible);  */
+#endif
+
     try {
-        // cost = sqrt(sum((v_r - v_0)^2)/n)
+        /* cost = sqrt(sum((v_r - v_0)^2)/n) */
         thrust::transform(thrust::device, dv_r, dv_r + n_visible, dv_0, dv_r, Square_diff());
         float sum = thrust::reduce(thrust::device, dv_r, dv_r + n_visible);
         return sqrt(sum/n_visible);
@@ -206,9 +210,9 @@ float* RBM::get_h_given_v(float* h, const float* v){
     blas.matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
-    print_gpu("h after multiplying W", h, 100); 
     add_sigmoid<do_sample><<<gsize,bsize>>>(h, this->pc, n_hidden);
     KERNEL_CHECK;
+    assert(!has_nan(h, n_hidden));
     return h;
 }
 
@@ -221,6 +225,7 @@ float* RBM::get_v_given_h(const float* h, float* v){
     const int gsize = CeilDiv(n_visible,bsize);
     add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pb, n_visible);
     KERNEL_CHECK;
+    assert(!has_nan(v, n_visible));
     return v;
 }
 

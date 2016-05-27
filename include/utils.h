@@ -15,6 +15,11 @@ __device__ __host__ int CeilDiv(int a, int b);
  */
 void randn(float *array, int size);
 
+/*
+ * Checking is a vector has a corrupted Infinity value
+ */
+bool has_nan(const float* v, size_t size);
+
 void cudaErrCheck_(cudaError_t stat, const char *file, int line);
 void cublasErrCheck_(cublasStatus_t stat, const char *file, int line);
 void curandErrCheck_(curandStatus_t stat, const char *file, int line);

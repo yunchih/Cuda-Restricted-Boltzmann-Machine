@@ -57,3 +57,13 @@ void randn(float *array, int size) {
     curandGenerateUniform(prng, array, size);
     curandDestroyGenerator(prng);
 }
+bool has_nan(const float* a, size_t size){
+    float* res;
+    cudaErrCheck(cudaMalloc((void**) &res, sizeof(float)*size));
+    thrust::device_ptr<const float> p_a(a);
+    thrust::device_ptr<float> p_res(res);
+    thrust::transform(thrust::device, p_a, p_a+size, p_res, NaNTest());
+    bool result = thrust::reduce(thrust::device, p_res, p_res+size);
+    cudaErrCheck(cudaFree(res));
+    return result;
+}

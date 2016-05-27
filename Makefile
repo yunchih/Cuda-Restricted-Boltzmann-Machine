@@ -6,7 +6,7 @@ INC_DIR   = include
 # Flags
 NVCC      = nvcc
 CXXFLAGS  =
-DEBUG     = -g -DDEBUG
+DEBUG     = -g -DDEBUG #-DNDEBUG  # disable assert()
 ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
 LIBS      = -lcublas -lcurand -lm #-lcublas_device -lcudadevrt 
@@ -15,7 +15,7 @@ NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 $(AR
 
 # Target
 MAIN     = main.cpp
-EXEC     = final
+EXEC     = rbm
 SOURCES  = $(wildcard *.cpp)
 SOURCES += $(wildcard *.cu)
 HEADERS += $(wildcard $(LIB)/*.h)
