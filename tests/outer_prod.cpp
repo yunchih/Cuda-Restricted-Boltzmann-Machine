@@ -1,4 +1,4 @@
-#include "../utils.h"
+#include "utils.h"
 #include <iostream>
 
 void printMatrix(const float* dM, int m, int n){
