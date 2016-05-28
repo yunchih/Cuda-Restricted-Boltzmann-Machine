@@ -59,4 +59,27 @@ private:
     Blas blas;
 };
 
+/*
+ *   ============================
+ *   Helper functions for rbm.cu
+ *   ============================
+ */
+template <bool do_sample>
+static __global__ void add_sigmoid(float* x, const float* y, int size);
+static __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
+static __global__ void vec_sample(float* v, int size);
+static __global__ void random_fill_range(float* w, int size, float low, float high);
+__forceinline__ __device__ float get_sample(float f);
+__forceinline__ __device__ float get_rand();
+__forceinline__ __device__ float sigmoidf(float in);
+
+/*
+ * Helper struct used to compute square error
+ */
+struct Square_diff{
+    __host__ __device__ float operator()(const float &lhs, const float &rhs) const {
+        return (lhs - rhs)*(lhs - rhs);
+    }
+};
+
 #endif

@@ -7,11 +7,11 @@ INC_DIR   = $(PWD)/include
 # Flags
 NVCC      = nvcc
 CXXFLAGS  =
-DEBUG     = -g -DDEBUG #-DNDEBUG  # disable assert()
+DEBUG     = -DNDEBUG #-g -DDEBUG
 ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
-LIBS      = -lcublas -lcurand -lm #-lcublas_device -lcudadevrt 
-OPTIMIZE  = #-O2
+LIBS      = -lcublas -lcurand -lm
+OPTIMIZE  = -O2
 NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 $(ARCH) $(INC) $(OPTIMIZE) $(DEBUG)
 
 # Target
@@ -49,7 +49,7 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.05 20 5 1000 10
+	./$(EXEC) out data/train-images-idx3-ubyte 0.02 20 10 800 10
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

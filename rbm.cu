@@ -2,29 +2,6 @@
 #include "debug.h"
 #include "messages.h"
 
-/*
- *   ==========================
- *   Helper function prototypes
- *   ==========================
- */
-template <bool do_sample>
-__global__ void add_sigmoid(float* x, const float* y, int size);
-__global__ void add_diff(float* a, const float* x, const float* y, const float c, int size);
-__global__ void vec_sample(float* v, int size);
-__global__ void random_fill_range(float* w, int size, float low, float high);
-__forceinline__ __device__ float get_sample(float f);
-__forceinline__ __device__ float get_rand();
-__forceinline__ __device__ float sigmoidf(float in);
-/*
- * Helper struct used to compute square error
- */
-struct Square_diff{
-    __host__ __device__ float operator()(const float &lhs, const float &rhs) const {
-        return (lhs - rhs)*(lhs - rhs);
-    }
-};
-/*   ===========================   */
-
 RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader):
     n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), 
     n_epoch(_n_epoch), n_CD(_n_CD), n_sample(_sample_size),
@@ -35,9 +12,9 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int 
     cudaErrCheck(cudaMalloc((void**)&(this->pC), _n_hidden*sizeof(float)));
 
     // Initialize weights
-    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, -0.15, 0.15);
-    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, .0, .1);
-    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, .0, .1);
+    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, 0.0, 0.1);
+    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, 0.0, 0.05);
+    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, 0.0, 0.05);
     
     assert(!has_nan(this->pW, n_visible*n_hidden));
     assert(!has_nan(this->pB, n_visible));
