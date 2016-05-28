@@ -1,7 +1,8 @@
 # Directories
-BUILD_DIR = bin
-TEST_DIR  = tests
-INC_DIR   = include
+PWD       = $(shell pwd)
+BUILD_DIR = $(PWD)/bin
+TEST_DIR  = $(PWD)/tests
+INC_DIR   = $(PWD)/include
 
 # Flags
 NVCC      = nvcc
@@ -47,8 +48,8 @@ tests:
 	$(MAKE) -C $(TEST_DIR) bin/$(TARGET) 
 
 run:
-	# [Output directory] [Training data] [Learning rate] [Epoch number] [Train data size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.1 1 2
+	# [Output directory] [Training data] [Learning rate] [Epoch number] [Train data size] [Random sample size]
+	./$(EXEC) out data/train-images-idx3-ubyte 0.05 20 5000 10
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

@@ -89,7 +89,7 @@ private:
 
 public:
     ~MnistReader(){
-        cudaErrCheck(cudaFree((void*)(this->gpu_buffer)));
+        cudaErrCheck(cudaFree(this->gpu_buffer));
         delete [] this->cpu_buffer;
     }
     int get_total(){

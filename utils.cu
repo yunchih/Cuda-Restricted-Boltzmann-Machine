@@ -57,6 +57,13 @@ void randn(float *array, int size) {
     curandGenerateUniform(prng, array, size);
     curandDestroyGenerator(prng);
 }
+
+struct NaNTest { 
+    __host__ __device__ bool operator()(const float a) const {
+        return isnan(a);
+    }
+};
+
 bool has_nan(const float* a, size_t size){
     float* res;
     cudaErrCheck(cudaMalloc((void**) &res, sizeof(float)*size));
