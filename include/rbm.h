@@ -24,7 +24,7 @@
 class RBM {
 
 public:
-    RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _sample_size, MnistReader& _reader);
+    RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader);
     ~RBM();
     void train();
 
@@ -47,7 +47,7 @@ private:
 
 /* Fields */
     int n_visible, n_hidden;
-    int n_epoch, n_train_data, n_sample;
+    int n_epoch, n_train_data, n_CD, n_sample;
     float learning_rate;
 
     /* pW: _n_visible * _n_hidden matrix */

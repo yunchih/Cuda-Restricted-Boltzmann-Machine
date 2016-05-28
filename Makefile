@@ -48,8 +48,8 @@ tests:
 	$(MAKE) -C $(TEST_DIR) bin/$(TARGET) 
 
 run:
-	# [Output directory] [Training data] [Learning rate] [Epoch number] [Train data size] [Random sample size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.05 20 5000 10
+	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
+	./$(EXEC) out data/train-images-idx3-ubyte 0.05 20 5 1000 10
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

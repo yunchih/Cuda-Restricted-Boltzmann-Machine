@@ -25,8 +25,9 @@ struct Square_diff{
 };
 /*   ===========================   */
 
-RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _sample_size, MnistReader& _reader):
-    n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), n_epoch(_n_epoch), n_sample(_sample_size),
+RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader):
+    n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), 
+    n_epoch(_n_epoch), n_CD(_n_CD), n_sample(_sample_size),
     reader(_reader){
 
     cudaErrCheck(cudaMalloc((void**)&(this->pW), _n_visible*_n_hidden*sizeof(float)));
@@ -86,38 +87,23 @@ void RBM::do_contrastive_divergence(const float* v_0){
         cudaFree(h_0);
         return;
     }
-    
-    /*
-    // CD-k
-    // Initial hidden unit sampling: h0
-    get_h_given_v<true>( h_0, v_0 );
-    get_v_given_h<true>( h_k, v_k );
-
-    cudaMemcpy(v_k, v_0, sizeof(float)*n_visible, cudaMemcpyDeviceToDevice);
-
-    // Gibbs sampling
-    for(int i = 0; i < this->n_cd_iter; ++i){
-        get_h_given_v<true>( h_k, v_k );
-        get_v_given_h<true>( h_k, v_k );
-    }
-
-    get_h_given_v<false>( h_k, v_k );
-    */
-
-    // CD-1
-    /* see machinelearning.org/archive/icml2008/papers/601.pdf */ 
-    float* h_s = h_k;
 
     /* positive phase */
-    get_h_given_v<false>( h_0, v_0 );        /* h_0  <- sigmoid(W*v_0 + c) */
+    get_h_given_v<false>( h_0, v_0 ); /* h_0 <- sigmoid(W*v_0 + c) */
 
     /* negative phase: CD-1 */
-    sample_h(h_s, h_0);                      /* h_s  ~ sigmoid(W*v_0 + c) */
-    /* check_nan("h_s", h_s, n_hidden); */
-    get_v_given_h<true>( h_s, v_k );         /* v_k  ~ sigmoid(W*h_s + b) */
-    /* check_nan("v_k", v_k, n_visible); */
-    get_h_given_v<false>( h_k, v_k );        /* h_k <- sigmoid(W*v_k + c) */
-    /* check_nan("h_k", h_k, n_hidden); */
+    sample_h(h_k, h_0);               /* h_k ~ sigmoid(W*v_0 + c) */
+    get_v_given_h<true>( h_k, v_k );  /* v_k ~ sigmoid(W*h_k + b) */
+
+    // CD-k
+    /* see http://machinelearning.org/archive/icml2008/papers/601.pdf */ 
+    for(int i = 0; i < this->n_CD - 1; ++i){
+        get_h_given_v<true>( h_k, v_k ); /* h_k ~ sigmoid(W*h_k + c) */
+        get_v_given_h<true>( h_k, v_k ); /* v_k ~ sigmoid(W*h_k + b) */
+    }
+
+    /* Do not sample hidden unit in last step of CD */
+    get_h_given_v<false>( h_k, v_k ); /* h_k <- sigmoid(W*v_k + c) */
 
     this->update_w( h_0, v_0, h_k, v_k );
     this->update_b( v_0, v_k );
@@ -127,9 +113,7 @@ void RBM::do_contrastive_divergence(const float* v_0){
 void RBM::train(){
     for(int i = 0; i < this->n_epoch; ++i){
         train_step();
-        /* calculate cost here */
         float cost = calculate_cost();
-        std::cout.precision(3);
         print_train_error(i+1, cost);
     }
 }

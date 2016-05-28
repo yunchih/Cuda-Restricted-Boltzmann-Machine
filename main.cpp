@@ -22,11 +22,11 @@ int change_dir(const char* dir_name){
 }
 int main(int argc, char *argv[])
 {
-    if(argc != 7){
+    if(argc != 8){
         std::cerr << COLOR_BOLD_RED_BLACK << "Usage: "
                   << COLOR_BOLD_BLUE_BLACK
                   << argv[0] 
-                  << " [Output directory] [Training data] [Learning rate] [Epoch number] [Train data size] [Random sample size]"
+                  << " [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]"
                   << COLOR_NORMAL
                   << std::endl;
         exit(1);
@@ -35,8 +35,9 @@ int main(int argc, char *argv[])
     const char* train_data_file = argv[2];
     const float learning_rate   = atof(argv[3]);
     const int   n_epoch         = atoi(argv[4]);
-    const int   train_size      = atoi(argv[5]);
-    const int   sample_size     = atoi(argv[6]);
+    const int   n_cd            = atoi(argv[5]);
+    const int   train_size      = atoi(argv[6]);
+    const int   sample_size     = atoi(argv[7]);
 
     std::cout << COLOR_BOLD << "Starting RBM with the following configurations:" << COLOR_NORMAL << std::endl;
     std::cout << COLOR_GREEN_BLACK;
@@ -44,6 +45,7 @@ int main(int argc, char *argv[])
     std::cout << std::setw(20) << "[Training data]"      << " = " << train_data_file << std::endl;
     std::cout << std::setw(20) << "[Learning rate]"      << " = " << learning_rate   << std::endl;
     std::cout << std::setw(20) << "[Epoch number]"       << " = " << n_epoch         << std::endl;
+    std::cout << std::setw(20) << "[CD step]"            << " = " << n_cd            << std::endl;
     std::cout << std::setw(20) << "[Train data size]"    << " = " << train_size      << std::endl;
     std::cout << std::setw(20) << "[Random sample size]" << " = " << sample_size     << std::endl;
     std::cout << COLOR_NORMAL << std::endl;
@@ -51,7 +53,7 @@ int main(int argc, char *argv[])
     MnistReader reader(train_data_file, train_size);
     change_dir(out_dir);
 
-    RBM rbm(784, 500, learning_rate, n_epoch, sample_size, reader);
+    RBM rbm(784, 500, learning_rate, n_epoch, n_cd, sample_size, reader);
     rbm.train();
     return 0;
 }
