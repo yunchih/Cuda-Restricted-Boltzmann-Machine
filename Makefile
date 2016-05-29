@@ -49,7 +49,11 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.02 20 10 800 10
+	./$(EXEC) out data/train-images-idx3-ubyte 0.02 10 10 800 10
+
+time:
+	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
+	time ./$(EXEC) out data/train-images-idx3-ubyte 0.02 10 10 800 10
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

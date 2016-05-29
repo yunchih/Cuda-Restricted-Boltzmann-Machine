@@ -72,6 +72,50 @@ struct Blas {
             z, zj
         ));
     }
+    /*
+     * y = v*A
+     *
+     * vj: dimension of vector v
+     * Ai: row number of x
+     * Aj: column number of y
+     *
+     */
+    void matrix_vec_mul(const float* v, const float*A, float* y, int vj, int Ai, int Aj){
+        float alpha = 1.0, beta = 0.0;
+        int m = Aj, n = Ai;
+        cublasErrCheck(cublasSgemv(
+            this->handle,
+            CUBLAS_OP_N,
+            m, n,
+            &alpha,
+            A, m,
+            v, 1,
+            &beta,
+            y, 1
+        ));
+    }
+    /*
+     * y = v*transpose(A)
+     *
+     * vj: dimension of vector v
+     * Ai: row number of x
+     * Aj: column number of y
+     *
+     */
+    void matrix_vec_mul_tranpose(const float* v, const float*A, float* y, int vj, int Ai, int Aj){
+        float alpha = 1.0, beta = 0.0;
+        int m = Aj, n = Ai;
+        cublasErrCheck(cublasSgemv(
+            this->handle,
+            CUBLAS_OP_T,
+            m, n,
+            &alpha,
+            A, m,
+            v, 1,
+            &beta,
+            y, 1
+        ));
+    }
     /* 
      * a = a + alpha*outer(x,y)
      * nrow: dimension of x

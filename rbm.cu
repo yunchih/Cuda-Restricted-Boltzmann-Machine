@@ -160,7 +160,7 @@ void RBM::sample_h(float* h_s, const float* h_0){
 template <bool do_sample>
 float* RBM::get_h_given_v(float* h, const float* v){
     // h = sigmoid(dot(v, W) + c)
-    blas.matrix_mul(v, this->pW, h, 1, n_visible, n_visible, n_hidden, n_hidden);
+    blas.matrix_vec_mul(v, this->pW, h, n_visible, n_visible, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_hidden,bsize);
     add_sigmoid<do_sample><<<gsize,bsize>>>(h, this->pC, n_hidden);
@@ -172,8 +172,7 @@ float* RBM::get_h_given_v(float* h, const float* v){
 template <bool do_sample>
 float* RBM::get_v_given_h(const float* h, float* v){
     // v = sigmoid(dot(h, transpose(W)) + b)
-    /* Transpose the second matrix */
-    blas.matrix_mul_tranpose_second(h, this->pW, v, 1, n_hidden, n_visible, n_hidden, n_visible); 
+    blas.matrix_vec_mul_tranpose(h, this->pW, v, n_hidden, n_visible, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
     add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pB, n_visible);
@@ -241,5 +240,6 @@ __forceinline__ __device__ float get_rand() {
  */
 __forceinline__ __device__ float sigmoidf(float in) {
     // raw approximation to sigmoid function
-    return 0.5 + 0.5*in / (1.f + fabsf(in));  
+    // return 0.5 + 0.5*in / (1.f + fabsf(in));
+    return 1.0/(1.0+__expf(-in));
 }

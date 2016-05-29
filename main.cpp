@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
     MnistReader reader(train_data_file, train_size);
     change_dir(out_dir);
 
-    RBM rbm(784, 500, learning_rate, n_epoch, n_cd, sample_size, reader);
+    RBM rbm(784, 512, learning_rate, n_epoch, n_cd, sample_size, reader);
     rbm.train();
     return 0;
 }
