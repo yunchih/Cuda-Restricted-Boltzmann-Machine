@@ -11,10 +11,13 @@
 #include <curand_kernel.h>
 #include <cuda.h>
 #include <cassert>
+#include <string>
+#include <sstream>
 #include <algorithm>
 #include <random>
 #include <cstdlib>
 #include <iomanip>
+#include <utility>
 #include <cmath>
 #include <ctime>
 #include "utils.h"
@@ -24,7 +27,7 @@
 class RBM {
 
 public:
-    RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader);
+    RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader, std::pair<int,int> out_img_dimension);
     ~RBM();
     void train();
 
@@ -33,6 +36,8 @@ private:
     void update_b(const float* v_0, const float* v_k);
     void update_c(const float* h_0, const float* h_k);
     void do_contrastive_divergence(const float* v_0);
+    float* reconstruct(const float* v_0);
+    void write_reconstruct_image(int epoch, float cost);
     void sample_h(float* h_s, const float* h_0);
     float calculate_cost_each(const float* v_0);
     float calculate_cost();
@@ -55,6 +60,7 @@ private:
     /* pc: _n_hidden vector  */
     float *pW, *pB, *pC;
 
+    std::pair<int,int> out_img_d;
     MnistReader& reader;
     Blas blas;
 };

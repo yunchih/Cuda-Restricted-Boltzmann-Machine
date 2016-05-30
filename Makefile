@@ -6,13 +6,14 @@ INC_DIR   = $(PWD)/include
 
 # Flags
 NVCC      = nvcc
-CXXFLAGS  =
-DEBUG     = -DNDEBUG #-g -DDEBUG
+CXXFLAGS  = -fopenmp
+DEBUG     = -DDEBUG #-DNDEBUG #-g -DDEBUG
 ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
-LIBS      = -lcublas -lcurand -lm
+LIBS      = -lcublas -lcurand -lm -lgomp -lpthread
 OPTIMIZE  = -O2
 NVCCFLAGS = -ccbin="$(shell which c++)" -Xcompiler="$(CXXFLAGS)" -std=c++11 $(ARCH) $(INC) $(OPTIMIZE) $(DEBUG)
+NVCCLINK  = $(LIBS) -Xcompiler="$(CXXFLAGS)"
 
 # Target
 MAIN     = main.cpp
@@ -27,7 +28,7 @@ export # export all variables for sub-make
 
 # Main target
 all: dirs $(BUILDS)
-	$(NVCC) $(LIBS) $(BUILDS) -o $(EXEC)
+	$(NVCC) -o $(EXEC) $(NVCCLINK) $(BUILDS)
 
 # To obtain object files
 $(BUILD_DIR)/%.o: %.cpp $(HEADERS)
@@ -49,11 +50,10 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.02 10 10 800 10
+	./$(EXEC) out data/train-images-idx3-ubyte 0.02 100 2 700 10
 
 time:
-	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	time ./$(EXEC) out data/train-images-idx3-ubyte 0.02 10 10 800 10
+	time $(MAKE) run
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

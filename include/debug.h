@@ -44,8 +44,8 @@ static void _check_nan(const char* name, const float* a, size_t size, const char
 
 #else
 
-#define print_gpu(name, gpu_array, size, type)
-#define print_cpu(name, gpu_array, size, type)
+#define print_gpu(name, gpu_array, size)
+#define print_cpu(name, gpu_array, size)
 #define check_nan(name, array, size)
 
 #endif

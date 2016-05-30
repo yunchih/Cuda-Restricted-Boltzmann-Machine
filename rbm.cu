@@ -29,7 +29,7 @@ RBM::~RBM(){
     cudaErrCheck(cudaFree(this->pC));
 
     // Free the memory allocated in these functions
-    calculate_cost_each(NULL);
+    reconstruct(NULL);
     do_contrastive_divergence(NULL);
 }
 void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const float* v_k){
@@ -86,12 +86,28 @@ void RBM::do_contrastive_divergence(const float* v_0){
     this->update_b( v_0, v_k );
     this->update_c( h_0, h_k );
 }
+void RBM::write_reconstruct_image(int epoch, float cost){
+    int rand_i = std::rand() % this->n_train_data;
+    const float* v_r = reconstruct(reader.get_example_at(rand_i));
 
+    std::unique_ptr<float[]> cpu_v(new float[n_visible]);
+    std::unique_ptr<uint8_t[]> result(new uint8_t[n_visible]);
+    cudaMemcpy(cpu_v.get(), v_r, sizeof(float)*n_visible, cudaMemcpyDeviceToHost);
+    #pragma omp parallel for
+    for(int i = 0; i < n_visible; ++i)
+        result[i] = (uint8_t)(cpu_v[i] * 255.0);
+    
+    char out[50];
+    snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost);
+    PGM_Writer writer(out, this->out_img_d.first, this->out_img_d.second);
+    writer.write(result.get(),n_visible);
+}
 void RBM::train(){
     for(int i = 0; i < this->n_epoch; ++i){
         train_step();
         float cost = calculate_cost();
         print_train_error(i+1, cost);
+        write_reconstruct_image(i+1, cost);
     }
 }
 void RBM::train_step(){
@@ -101,16 +117,20 @@ void RBM::train_step(){
     }
 }
 float RBM::calculate_cost(){
-    float mean_cost = 0.0;
+    float mean_cost = 0.0, each_cost = 0.0;
     std::srand(std::time(0));
+
+    #pragma omp parallel for reduction(+:mean_cost) private(each_cost) 
     for(int i = 0; i < this->n_sample; ++i){
         int rand_i = std::rand() % this->n_train_data;
         const float* rand_example = reader.get_example_at(rand_i);
-        mean_cost += calculate_cost_each(rand_example);
+        each_cost = calculate_cost_each(rand_example);
+        mean_cost += each_cost; 
     }
+
     return mean_cost / (float)this->n_sample;
 }
-float RBM::calculate_cost_each(const float* v_0){
+float* RBM::reconstruct(const float* v_0){
     static float *h_s = NULL, *v_r = NULL;
     if(h_s == NULL){
         cudaErrCheck(cudaMalloc((void**)&v_r, sizeof(float)*n_visible));
@@ -119,15 +139,20 @@ float RBM::calculate_cost_each(const float* v_0){
     if(v_0 == NULL && v_r){
         cudaErrCheck(cudaFree(v_r));
         cudaErrCheck(cudaFree(h_s));
-        return 0.0;
+        return NULL;
     }
 
     /* reconstruction */
     get_h_given_v<true>( h_s, v_0 );  /* h_s  ~ sigmoid(W*v_0 + c) */
     get_v_given_h<false>( h_s, v_r ); /* v_r  <- sigmoid(W*h_s + b) */
 
+    return v_r;
+}
+float RBM::calculate_cost_each(const float* v_0){
+    float* v_r = reconstruct(v_0);
+    /* print_gpu("v_0", v_0, n_visible); */
+    /* print_gpu("v_r", v_r, n_visible); */
     thrust::device_ptr<float> dv_r(v_r);
-    thrust::device_ptr<float> dh_s(h_s);
     thrust::device_ptr<const float> dv_0(v_0);
     
     try {
