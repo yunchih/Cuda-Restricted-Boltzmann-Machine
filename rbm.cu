@@ -41,21 +41,18 @@ void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const f
 }
 void RBM::update_b(const float* v_0, const float* v_k){
     // b += learning_rate * (v_0 - v_k)
-    const int bsize = 128;
-    const int gsize = CeilDiv(n_visible,bsize);
-    add_diff<<<gsize,bsize>>>(this->pB, v_0, v_k, learning_rate, n_visible);
+    add_diff<<<CeilDiv(n_visible,128),128>>>(this->pB, v_0, v_k, learning_rate, n_visible);
     KERNEL_CHECK;
 }
 void RBM::update_c(const float* h_0, const float* h_k){
     // c += learning_rate * (h_0 - h_k)
-    const int bsize = 128;
-    const int gsize = CeilDiv(n_hidden,bsize);
-    add_diff<<<gsize,bsize>>>(this->pC, h_0, h_k, learning_rate, n_hidden);
+    add_diff<<<CeilDiv(n_visible,128),128>>>(this->pC, h_0, h_k, learning_rate, n_hidden);
     KERNEL_CHECK;
 }
 void RBM::do_contrastive_divergence(const float* v_0){
     static float *v_k = NULL, *h_k = NULL, *h_0 = NULL;
     if(v_k == NULL){
+        /* Allocate memory used throughout the training */
         cudaErrCheck(cudaMalloc((void**) &v_k, sizeof(float)*n_visible));
         cudaErrCheck(cudaMalloc((void**) &h_k, sizeof(float)*n_hidden));
         cudaErrCheck(cudaMalloc((void**) &h_0, sizeof(float)*n_hidden));
@@ -75,13 +72,13 @@ void RBM::do_contrastive_divergence(const float* v_0){
     get_v_given_h<true>( h_k, v_k );  /* v_k ~ sigmoid(W*h_k + b) */
 
     // CD-k
-    /* see http://machinelearning.org/archive/icml2008/papers/601.pdf */ 
+    /* see Reference in README.md */ 
     for(int i = 0; i < this->n_CD - 1; ++i){
         get_h_given_v<true>( h_k, v_k ); /* h_k ~ sigmoid(W*h_k + c) */
         get_v_given_h<true>( h_k, v_k ); /* v_k ~ sigmoid(W*h_k + b) */
     }
 
-    /* Do not sample hidden unit in last step of CD */
+    /* Do not sample hidden unit in last step of CD (See Hinton's Guide) */
     get_h_given_v<false>( h_k, v_k ); /* h_k <- sigmoid(W*v_k + c) */
 
     this->update_w( h_0, v_0, h_k, v_k );
@@ -134,6 +131,7 @@ float RBM::calculate_cost(){
 float* RBM::reconstruct(const float* v_0){
     static float *h_s = NULL, *v_r = NULL;
     if(h_s == NULL){
+        /* Allocate memory used throughout the training */
         cudaErrCheck(cudaMalloc((void**)&v_r, sizeof(float)*n_visible));
         cudaErrCheck(cudaMalloc((void**)&h_s, sizeof(float)*n_hidden));
     }
@@ -151,8 +149,6 @@ float* RBM::reconstruct(const float* v_0){
 }
 float RBM::calculate_cost_each(const float* v_0){
     float* v_r = reconstruct(v_0);
-    /* print_gpu("v_0", v_0, n_visible); */
-    /* print_gpu("v_r", v_r, n_visible); */
     thrust::device_ptr<float> dv_r(v_r);
     thrust::device_ptr<const float> dv_0(v_0);
     
@@ -214,7 +210,9 @@ float* RBM::get_v_given_h(const float* h, float* v){
  */
 
 /*
- * x = sigmoid(x + y)
+ * if do_sample == true:  x ~ sigmoid(x + y)
+ * if do_sample == false: x = sigmoid(x + y)
+ * `x ~ p` means x is turn on (set to 1.0) with probability of p
  */
 template <bool do_sample>
 __global__ void add_sigmoid(float* x, const float* y, int size){
