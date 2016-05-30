@@ -21,7 +21,9 @@ static void _print_gpu(const char* name, const T* gpu_array, size_t size, const 
     cudaMemcpy(cpu_array, gpu_array, sizeof(T)*size, cudaMemcpyDeviceToHost);
     std::cout << COLOR_GREEN_BLACK << "[" << filename << ":" << line << "] " << COLOR_BLUE_BLACK
               << name << ": " << COLOR_NORMAL << std::endl;
+    std::cout << std::setprecision(2);
     for(int i = 0; i < size; ++i )
+        // std::cout << (cpu_array[i] > 0.5 ? cpu_array[i] : 0.0) << " ";
         std::cout << cpu_array[i] << " ";
     std::cout << std::endl;
     free(cpu_array);

@@ -41,7 +41,7 @@ $(BUILD_DIR)/%.o: %.cpp $(HEADERS)
 $(BUILD_DIR)/%.o: %.cu $(HEADERS)
 	$(NVCC) -c $(NVCCFLAGS) $< -o $@
 
-.PHONY: dirs clean tests run
+.PHONY: dirs clean tests run runall
 
 dirs:
 	@[ -d $(BUILD_DIR) ] ||  (echo "Creating directories: $(BUILD_DIR)" && mkdir -p $(BUILD_DIR))
@@ -54,7 +54,7 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) $(OUT_DIR) data/train-images-idx3-ubyte 0.02 10 2 100 10
+	./$(EXEC) $(OUT_DIR) data/train-images-idx3-ubyte 0.02 100 2 100 10
 
 time:
 	time $(MAKE) run
@@ -62,7 +62,7 @@ time:
 runall: run
 	@which $(TILER) 2>&1 > /dev/null \
 		&& $(TILER) -resize 300% $(OUT_DIR)/*  -pointsize 14 -set label "%f" -geometry '+5+5>' $(COMBINED) \
-		|| echo "Please ensure \"$(TILER)\" is installed and the arguments are correct";
+		|| echo "Please ensure ImageMagick is installed and the arguments passwd to \"$(TILER)\" are correct";
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

@@ -1,20 +1,22 @@
 #include "rbm.h"
 #include "debug.h"
 #include "messages.h"
+#include "pgm.h"
 
-RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader):
+RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int
+        _sample_size, MnistReader& _reader, std::pair<int,int> out_img_dimension):
     n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), 
-    n_epoch(_n_epoch), n_CD(_n_CD), n_sample(_sample_size),
-    reader(_reader){
+    n_epoch(_n_epoch), n_CD(_n_CD), n_sample(_sample_size), 
+    out_img_d(out_img_dimension), reader(_reader){
 
     cudaErrCheck(cudaMalloc((void**)&(this->pW), _n_visible*_n_hidden*sizeof(float)));
     cudaErrCheck(cudaMalloc((void**)&(this->pB), _n_visible*sizeof(float)));
     cudaErrCheck(cudaMalloc((void**)&(this->pC), _n_hidden*sizeof(float)));
 
     // Initialize weights
-    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, 0.0, 0.1);
-    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, 0.0, 0.05);
-    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, 0.0, 0.05);
+    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, -0.1, 0.1);
+    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, 0.0, 0.1);
+    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, 0.0, 0.1);
     
     assert(!has_nan(this->pW, n_visible*n_hidden));
     assert(!has_nan(this->pB, n_visible));
@@ -97,8 +99,9 @@ void RBM::write_reconstruct_image(int epoch, float cost){
     for(int i = 0; i < n_visible; ++i)
         result[i] = (uint8_t)(cpu_v[i] * 255.0);
     
-    char out[50];
-    snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost);
+    char out[30];
+    snprintf(out, sizeof(out), "%03d", epoch);
+    /* snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost); */
     PGM_Writer writer(out, this->out_img_d.first, this->out_img_d.second);
     writer.write(result.get(),n_visible);
 }
@@ -117,15 +120,13 @@ void RBM::train_step(){
     }
 }
 float RBM::calculate_cost(){
-    float mean_cost = 0.0, each_cost = 0.0;
+    float mean_cost = 0.0;
     std::srand(std::time(0));
 
-    #pragma omp parallel for reduction(+:mean_cost) private(each_cost) 
     for(int i = 0; i < this->n_sample; ++i){
         int rand_i = std::rand() % this->n_train_data;
         const float* rand_example = reader.get_example_at(rand_i);
-        each_cost = calculate_cost_each(rand_example);
-        mean_cost += each_cost; 
+        mean_cost += calculate_cost_each(rand_example); 
     }
 
     return mean_cost / (float)this->n_sample;

@@ -1,6 +1,5 @@
 #ifndef PGM_WRITER_H
 #define PGM_WRITER_H
-#include <err.h>
 #include <cstdio>
 #include <memory>
 #include <cstdint>
