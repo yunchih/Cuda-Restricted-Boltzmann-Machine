@@ -1,8 +1,12 @@
-# Directories
-PWD       = $(shell pwd)
-BUILD_DIR = $(PWD)/bin
-TEST_DIR  = $(PWD)/tests
-INC_DIR   = $(PWD)/include
+# Directories & files
+PWD       := $(shell pwd)
+NOW       := $(shell date +%Y-%m-%e_%H:%M:%S)
+BUILD_DIR := $(PWD)/bin
+TEST_DIR  := $(PWD)/tests
+INC_DIR   := $(PWD)/include
+OUT_DIR   := $(PWD)/$(NOW)_out
+TILER     := montage
+COMBINED  := $(NOW)_combined.pgm
 
 # Flags
 NVCC      = nvcc
@@ -50,10 +54,15 @@ tests:
 
 run:
 	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) out data/train-images-idx3-ubyte 0.02 100 2 700 10
+	./$(EXEC) $(OUT_DIR) data/train-images-idx3-ubyte 0.02 10 2 100 10
 
 time:
 	time $(MAKE) run
+
+runall: run
+	@which $(TILER) 2>&1 > /dev/null \
+		&& $(TILER) -resize 300% $(OUT_DIR)/*  -pointsize 14 -set label "%f" -geometry '+5+5>' $(COMBINED) \
+		|| echo "Please ensure \"$(TILER)\" is installed and the arguments are correct";
 
 cycle:
 	$(MAKE) clean && $(MAKE) -j && $(MAKE) run

@@ -33,6 +33,13 @@
 * Cuda 6.5
 * gcc 4.8.5
 * Ubuntu 15.10 4.2.0-34-generic
+* ImageMagick 6.8.9
+
+# Prerequisite
+
+* OpenMP
+* ImageMagick
+* Cuda Runtime
 
 # Reference
 
