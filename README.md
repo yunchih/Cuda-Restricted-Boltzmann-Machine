@@ -8,7 +8,7 @@
 
 ```
 
-./rbm [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
+./rbm [Output directory] [Train filename] [Test filename] [Learning rate] [Epoch number] [CD step] [Train data size] [Test data size] [Random sample size]
 
 ```
 
@@ -21,11 +21,13 @@
 ### Argument
 
 * **Output directory**: directory where output filter images be stored
-* **Training data**: MNIST training data, i.e. `train-images-idx3-ubyte`
+* **Train filename**: MNIST training data, i.e. `train-images-idx3-ubyte`
+* **Test filename**: MNIST testing data, i.e. `t10k-images-idx3-ubyte`
 * **Learning rate** 
 * **Epoch number** 
 * **CD step**: number of steps taken in Constrastive Divergence
 * **Train data size**
+* **Test data size**
 * **Random sample size**: number of samples used to estimate the error of reconstruction in each epoch
 
 # Development platform
@@ -37,7 +39,6 @@
 
 # Prerequisite
 
-* OpenMP
 * ImageMagick
 * Cuda Runtime
 

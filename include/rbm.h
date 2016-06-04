@@ -27,7 +27,10 @@
 class RBM {
 
 public:
-    RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int _sample_size, MnistReader& _reader, std::pair<int,int> out_img_dimension);
+    RBM(int _n_visible, int _n_hidden, float _learning_rate, 
+        int _n_epoch, int _n_CD, int _sample_size, 
+        MnistReader& _train_reader, MnistReader& _test_reader, 
+        std::pair<int,int> out_img_dimension);
     ~RBM();
     void train();
 
@@ -61,7 +64,8 @@ private:
     float *pW, *pB, *pC;
 
     std::pair<int,int> out_img_d;
-    MnistReader& reader;
+    MnistReader& test_reader;
+    MnistReader& train_reader;
     Blas blas;
 };
 

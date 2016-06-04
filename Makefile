@@ -1,6 +1,6 @@
 # Directories & files
 PWD       := $(shell pwd)
-NOW       := $(shell date +%Y-%m-%e_%H:%M:%S)
+NOW       := $(shell date +%Y-%m-%d_%H:%M:%S)
 BUILD_DIR := $(PWD)/bin
 TEST_DIR  := $(PWD)/tests
 INC_DIR   := $(PWD)/include
@@ -11,7 +11,7 @@ COMBINED  := $(NOW)_combined.pgm
 # Flags
 NVCC      = nvcc
 CXXFLAGS  = -fopenmp
-DEBUG     = -DDEBUG #-DNDEBUG #-g -DDEBUG
+DEBUG     = -DNDEBUG # -g -DDEBUG
 ARCH      = -arch=compute_30 -code=sm_30 
 INC       = -I$(INC_DIR)
 LIBS      = -lcublas -lcurand -lm -lgomp -lpthread
@@ -53,8 +53,8 @@ tests:
 	$(MAKE) -C $(TEST_DIR) bin/$(TARGET) 
 
 run:
-	# [Output directory] [Training data] [Learning rate] [Epoch number] [CD step] [Train data size] [Random sample size]
-	./$(EXEC) $(OUT_DIR) data/train-images-idx3-ubyte 0.02 100 2 100 10
+	# [Output directory] [Train filename] [Test filename] [Learning rate] [Epoch number] [CD step] [Train data size] [Test data size] [Random sample size]
+	./$(EXEC) $(OUT_DIR) data/train-images-idx3-ubyte data/t10k-images-idx3-ubyte 0.02 40 1 1000 200 10
 
 time:
 	time $(MAKE) run
@@ -62,6 +62,7 @@ time:
 runall: run
 	@which $(TILER) 2>&1 > /dev/null \
 		&& $(TILER) -resize 300% $(OUT_DIR)/*  -pointsize 14 -set label "%f" -geometry '+5+5>' $(COMBINED) \
+		&& rm -rf $(OUT_DIR) \
 		|| echo "Please ensure ImageMagick is installed and the arguments passwd to \"$(TILER)\" are correct";
 
 cycle:

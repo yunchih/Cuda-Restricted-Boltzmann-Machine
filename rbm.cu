@@ -3,11 +3,13 @@
 #include "messages.h"
 #include "pgm.h"
 
-RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int _n_CD, int
-        _sample_size, MnistReader& _reader, std::pair<int,int> out_img_dimension):
+RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, 
+    int _n_epoch, int _n_CD, int _sample_size, 
+    MnistReader& _train_reader, MnistReader& _test_reader, 
+    std::pair<int,int> out_img_dimension):
     n_visible(_n_visible), n_hidden(_n_hidden), learning_rate(_learning_rate), 
     n_epoch(_n_epoch), n_CD(_n_CD), n_sample(_sample_size), 
-    out_img_d(out_img_dimension), reader(_reader){
+    out_img_d(out_img_dimension), train_reader(_train_reader), test_reader(_test_reader){
 
     cudaErrCheck(cudaMalloc((void**)&(this->pW), _n_visible*_n_hidden*sizeof(float)));
     cudaErrCheck(cudaMalloc((void**)&(this->pB), _n_visible*sizeof(float)));
@@ -22,7 +24,7 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate, int _n_epoch, int 
     assert(!has_nan(this->pB, n_visible));
     assert(!has_nan(this->pC, n_hidden));
 
-    this->n_train_data = reader.get_total();
+    this->n_train_data = train_reader.get_total();
 }
 RBM::~RBM(){
 
@@ -85,49 +87,6 @@ void RBM::do_contrastive_divergence(const float* v_0){
     this->update_b( v_0, v_k );
     this->update_c( h_0, h_k );
 }
-void RBM::write_reconstruct_image(int epoch, float cost){
-    int rand_i = std::rand() % this->n_train_data;
-    const float* v_r = reconstruct(reader.get_example_at(rand_i));
-
-    std::unique_ptr<float[]> cpu_v(new float[n_visible]);
-    std::unique_ptr<uint8_t[]> result(new uint8_t[n_visible]);
-    cudaMemcpy(cpu_v.get(), v_r, sizeof(float)*n_visible, cudaMemcpyDeviceToHost);
-    #pragma omp parallel for
-    for(int i = 0; i < n_visible; ++i)
-        result[i] = (uint8_t)(cpu_v[i] * 255.0);
-    
-    char out[30];
-    snprintf(out, sizeof(out), "%03d", epoch);
-    /* snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost); */
-    PGM_Writer writer(out, this->out_img_d.first, this->out_img_d.second);
-    writer.write(result.get(),n_visible);
-}
-void RBM::train(){
-    for(int i = 0; i < this->n_epoch; ++i){
-        train_step();
-        float cost = calculate_cost();
-        print_train_error(i+1, cost);
-        write_reconstruct_image(i+1, cost);
-    }
-}
-void RBM::train_step(){
-    for(int i = 0; i < this->n_train_data; ++i){
-        const float* cur_example = reader.get_example_at(i);
-        do_contrastive_divergence(cur_example);
-    }
-}
-float RBM::calculate_cost(){
-    float mean_cost = 0.0;
-    std::srand(std::time(0));
-
-    for(int i = 0; i < this->n_sample; ++i){
-        int rand_i = std::rand() % this->n_train_data;
-        const float* rand_example = reader.get_example_at(rand_i);
-        mean_cost += calculate_cost_each(rand_example); 
-    }
-
-    return mean_cost / (float)this->n_sample;
-}
 float* RBM::reconstruct(const float* v_0){
     static float *h_s = NULL, *v_r = NULL;
     if(h_s == NULL){
@@ -147,6 +106,38 @@ float* RBM::reconstruct(const float* v_0){
 
     return v_r;
 }
+void RBM::write_reconstruct_image(int epoch, float cost){
+    int rand_i = std::rand() % this->n_train_data;
+    const float* v_r = reconstruct(train_reader.get_example_at(rand_i));
+    print_gpu("v_r", v_r, n_visible);
+
+    std::unique_ptr<float[]> cpu_v(new float[n_visible]);
+    std::unique_ptr<uint8_t[]> result(new uint8_t[n_visible]);
+    cudaMemcpy(cpu_v.get(), v_r, sizeof(float)*n_visible, cudaMemcpyDeviceToHost);
+    #pragma omp parallel for
+    for(int i = 0; i < n_visible; ++i)
+        result[i] = (uint8_t)(cpu_v[i] * 255.0);
+    
+    char out[30];
+    snprintf(out, sizeof(out), "%03d", epoch);
+    /* snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost); */
+    PGM_Writer writer(out, this->out_img_d.first, this->out_img_d.second);
+    writer.write(result.get(),n_visible);
+}
+void RBM::train_step(){
+    for(int i = 0; i < this->n_train_data; ++i){
+        const float* cur_example = train_reader.get_example_at(i);
+        do_contrastive_divergence(cur_example);
+    }
+}
+void RBM::train(){
+    for(int i = 0; i < this->n_epoch; ++i){
+        train_step();
+        float cost = calculate_cost();
+        print_train_error(i+1, cost);
+        write_reconstruct_image(i+1, cost);
+    }
+}
 float RBM::calculate_cost_each(const float* v_0){
     float* v_r = reconstruct(v_0);
     thrust::device_ptr<float> dv_r(v_r);
@@ -162,6 +153,19 @@ float RBM::calculate_cost_each(const float* v_0){
         throw_error("Thrust error: + " << e.what());
         return 0.0;
     }
+}
+float RBM::calculate_cost(){
+    int n_test_data = test_reader.get_total();
+    float mean_cost = 0.0;
+    std::srand(std::time(0));
+
+    for(int i = 0; i < this->n_sample; ++i){
+        int rand_i = std::rand() % n_test_data;
+        const float* rand_example = test_reader.get_example_at(rand_i);
+        mean_cost += calculate_cost_each(rand_example); 
+    }
+
+    return mean_cost / (float)this->n_sample;
 }
 __global__ void add_diff(float* a, const float* x, const float* y, const float c, int size){
     int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -197,6 +201,7 @@ float* RBM::get_v_given_h(const float* h, float* v){
     blas.matrix_vec_mul_tranpose(h, this->pW, v, n_hidden, n_visible, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
+    print_gpu("get_v_given_h", v, n_visible);
     add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pB, n_visible);
     KERNEL_CHECK;
     assert(!has_nan(v, n_visible));
@@ -265,5 +270,5 @@ __forceinline__ __device__ float get_rand() {
 __forceinline__ __device__ float sigmoidf(float in) {
     // raw approximation to sigmoid function
     // return 0.5 + 0.5*in / (1.f + fabsf(in));
-    return 1.0/(1.0+__expf(-in));
+    return 1.0/(1.0+__expf(in));
 }
