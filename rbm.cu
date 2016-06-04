@@ -109,18 +109,18 @@ float* RBM::reconstruct(const float* v_0){
 void RBM::write_reconstruct_image(int epoch, float cost){
     int rand_i = std::rand() % this->n_train_data;
     const float* v_r = reconstruct(train_reader.get_example_at(rand_i));
-    print_gpu("v_r", v_r, n_visible);
+    print_gpu_formatted("v_r", v_r, n_visible, 28, 28);
 
     std::unique_ptr<float[]> cpu_v(new float[n_visible]);
     std::unique_ptr<uint8_t[]> result(new uint8_t[n_visible]);
     cudaMemcpy(cpu_v.get(), v_r, sizeof(float)*n_visible, cudaMemcpyDeviceToHost);
+
     #pragma omp parallel for
     for(int i = 0; i < n_visible; ++i)
         result[i] = (uint8_t)(cpu_v[i] * 255.0);
     
     char out[30];
     snprintf(out, sizeof(out), "%03d", epoch);
-    /* snprintf(out, sizeof(out), "rbm-epoch_%d_cost_%.03f.pgm", epoch, cost); */
     PGM_Writer writer(out, this->out_img_d.first, this->out_img_d.second);
     writer.write(result.get(),n_visible);
 }
@@ -144,7 +144,7 @@ float RBM::calculate_cost_each(const float* v_0){
     thrust::device_ptr<const float> dv_0(v_0);
     
     try {
-        /* cost = sqrt(sum((v_r - v_0)^2)/n) */
+        // Square-Mean Error: cost = sqrt(sum((v_r - v_0)^2)/n)
         thrust::transform(thrust::device, dv_r, dv_r + n_visible, dv_0, dv_r, Square_diff());
         float sum = thrust::reduce(thrust::device, dv_r, dv_r + n_visible);
         return sqrt(sum/(float)n_visible);
@@ -270,5 +270,5 @@ __forceinline__ __device__ float get_rand() {
 __forceinline__ __device__ float sigmoidf(float in) {
     // raw approximation to sigmoid function
     // return 0.5 + 0.5*in / (1.f + fabsf(in));
-    return 1.0/(1.0+__expf(in));
+    return 1.0/(1.0+__expf(-in));
 }
