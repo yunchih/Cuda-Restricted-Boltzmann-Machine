@@ -40,7 +40,7 @@ private:
         }
 
         auto size = file.tellg();
-        auto header = new char[16];
+        char header[16];
 
         //Read the header
         file.seekg(0, std::ios::beg);
@@ -56,7 +56,7 @@ private:
         int avail_data_num = read_header_field(header,1);
 
         if(avail_data_num < data_num){
-            throw_error("Request data size [" << data_num << "] exceed size of available data");
+            throw_error("Request data size [" << data_num << "] exceed size of available data: " << avail_data_num);
             exit(1);
         }
         /* Training data */

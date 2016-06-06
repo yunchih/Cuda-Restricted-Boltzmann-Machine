@@ -16,9 +16,10 @@ RBM::RBM(int _n_visible, int _n_hidden, float _learning_rate,
     cudaErrCheck(cudaMalloc((void**)&(this->pC), _n_hidden*sizeof(float)));
 
     // Initialize weights
-    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden, -0.1, 0.1);
-    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, 0.0, 0.1);
-    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, 0.0, 0.1);
+    random_fill_range<<<CeilDiv(_n_visible*_n_hidden,256),256>>>(this->pW, _n_visible*_n_hidden,
+            -0.07, 0.02);
+    random_fill_range<<<CeilDiv(n_visible,128),128>>>(this->pB, _n_visible, -0.1, 0.1);
+    random_fill_range<<<CeilDiv(n_hidden,128),128>>>(this->pC, _n_hidden, -0.1, 0.1);
     
     assert(!has_nan(this->pW, n_visible*n_hidden));
     assert(!has_nan(this->pB, n_visible));
@@ -43,12 +44,15 @@ void RBM::update_w(const float* h_0, const float* v_0, const float* h_k, const f
 }
 void RBM::update_b(const float* v_0, const float* v_k){
     // b += learning_rate * (v_0 - v_k)
+    /* print_gpu_formatted("v_0", v_0, n_visible, 28, 28); */
+    /* print_gpu_formatted("v_k", v_k, n_visible, 28, 28); */
     add_diff<<<CeilDiv(n_visible,128),128>>>(this->pB, v_0, v_k, learning_rate, n_visible);
     KERNEL_CHECK;
+    /* print_gpu_formatted("updated_b", this->pB, n_visible, 28, 28); */
 }
 void RBM::update_c(const float* h_0, const float* h_k){
     // c += learning_rate * (h_0 - h_k)
-    add_diff<<<CeilDiv(n_visible,128),128>>>(this->pC, h_0, h_k, learning_rate, n_hidden);
+    add_diff<<<CeilDiv(n_hidden,128),128>>>(this->pC, h_0, h_k, learning_rate, n_hidden);
     KERNEL_CHECK;
 }
 void RBM::do_contrastive_divergence(const float* v_0){
@@ -108,8 +112,10 @@ float* RBM::reconstruct(const float* v_0){
 }
 void RBM::write_reconstruct_image(int epoch, float cost){
     int rand_i = std::rand() % this->n_train_data;
-    const float* v_r = reconstruct(train_reader.get_example_at(rand_i));
-    print_gpu_formatted("v_r", v_r, n_visible, 28, 28);
+    const float* v_0 = train_reader.get_example_at(rand_i);
+    const float* v_r = reconstruct(v_0);
+    print_gpu_formatted("example_original", v_0, n_visible, 28, 28);
+    print_gpu_formatted("example_reconstructed", v_r, n_visible, 28, 28);
 
     std::unique_ptr<float[]> cpu_v(new float[n_visible]);
     std::unique_ptr<uint8_t[]> result(new uint8_t[n_visible]);
@@ -201,7 +207,6 @@ float* RBM::get_v_given_h(const float* h, float* v){
     blas.matrix_vec_mul_tranpose(h, this->pW, v, n_hidden, n_visible, n_hidden);
     const int bsize = 128;
     const int gsize = CeilDiv(n_visible,bsize);
-    print_gpu("get_v_given_h", v, n_visible);
     add_sigmoid<do_sample><<<gsize,bsize>>>(v, this->pB, n_visible);
     KERNEL_CHECK;
     assert(!has_nan(v, n_visible));

@@ -7,6 +7,7 @@
 #include <thrust/execution_policy.h>
 #include <iostream>
 #include <iomanip>
+#include <cmath>
 #include "utils.h"
 #include "colors.h"
 
@@ -16,15 +17,21 @@
 #define print_gpu_formatted(name, gpu_array, size,width,height){ _print_gpu_formatted(name, gpu_array, size, width, height,  __FILE__, __LINE__); }
 #define check_nan(name, array, size){ _check_nan(name, array, size, __FILE__, __LINE__); }
 
+static inline float fRound(float f){
+    return std::floor(f * 10.0 + 0.1) / 10.0;
+}
 template <typename T>
 static void _print_gpu_formatted(const char* name, const T* gpu_array, size_t size, int w, int h, const char* filename, int line){
     T *cpu_array = (T*)malloc(sizeof(T)*size);
     cudaMemcpy(cpu_array, gpu_array, sizeof(T)*size, cudaMemcpyDeviceToHost);
     std::cout << COLOR_GREEN_BLACK << "[" << filename << ":" << line << "] " << COLOR_BLUE_BLACK
               << name << ": " << COLOR_NORMAL << std::endl;
-    for(int i = 0; i < w; ++i ){
-        for(int j = 0; j < h; ++j ){
-            std::cout << std::setw(7) << std::setprecision(0) << cpu_array[i];
+    for(int i = 0; i < h; ++i ){
+        for(int j = 0; j < w; ++j ){
+            if(std::fabs(cpu_array[i*w+j]) < 0.01)
+                std::cout << "       ";
+            else
+                std::cout << std::setw(7) << std::setprecision(1) << cpu_array[i*w+j];
         }
         std::cout << std::endl;
     }
